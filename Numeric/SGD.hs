@@ -12,13 +12,16 @@
 module Numeric.SGD
 ( SgdArgs (..)
 , sgdArgsDefault
+, Dataset
 , Para
+, sgd
 , sgdM
 , module Numeric.SGD.Grad
 ) where
 
 import Control.Applicative (Applicative)
 import Control.Monad (forM_)
+import Control.Monad.ST (ST, runST)
 import qualified System.Random as R
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as U
@@ -51,7 +54,7 @@ sgdArgsDefault = SgdArgs
     , tau       = 5 }
 
 -- | Dataset with elements of x type.
-type Data x     = V.Vector x
+type Dataset x  = V.Vector x
 
 -- | Vector of parameters.
 type Para       = U.Vector Double 
@@ -59,22 +62,36 @@ type Para       = U.Vector Double
 -- | Type synonym for mutable vector with Double values.
 type MVect m    = UM.MVector (Prim.PrimState m) Double
 
+-- | Pure version of the stochastic gradient descent method.
+sgd :: SgdArgs              -- ^ SGD parameter values
+    -> (Para -> x -> Grad)  -- ^ Gradient for dataset element
+    -> Dataset x            -- ^ Dataset
+    -> Para                 -- ^ Starting point
+    -> Para                 -- ^ SGD result
+sgd sgdArgs mkGrad dataset x0 =
+    let dummy _ _ = return ()
+    in  runST $ sgdM sgdArgs dummy mkGrad dataset x0
+
 -- | Monadic version of the stochastic gradient descent method.
 -- A notification function can be used to provide user with
 -- information about the progress of the learning.
 {-# SPECIALIZE sgdM :: SgdArgs
                     -> (Para -> Int -> IO ())
                     -> (Para -> x -> Grad)
-                    -> Data x -> Para -> IO Para #-}
+                    -> Dataset x -> Para -> IO Para #-}
+{-# SPECIALIZE sgdM :: SgdArgs
+                    -> (Para -> Int -> ST s ())
+                    -> (Para -> x -> Grad)
+                    -> Dataset x -> Para -> ST s Para #-}
 sgdM
     :: (Applicative m, Prim.PrimMonad m)
     => SgdArgs              -- ^ SGD parameter values
     -> (Para -> Int -> m ())    -- ^ Notification run every update
-    -> (Para -> x -> Grad)  -- ^ Gradient update
-    -> Data x               -- ^ Dataset
+    -> (Para -> x -> Grad)  -- ^ Gradient for dataset element
+    -> Dataset x            -- ^ Dataset
     -> Para                 -- ^ Starting point
     -> m Para               -- ^ SGD result
-sgdM SgdArgs{..} notify update dataset x0 = do
+sgdM SgdArgs{..} notify mkGrad dataset x0 = do
     u <- UM.new (U.length x0)
     doIt u 0 (R.mkStdGen 0) =<< U.thaw x0
   where
@@ -94,12 +111,12 @@ sgdM SgdArgs{..} notify update dataset x0 = do
         let (batch, stdGen') = sample stdGen batchSize dataset
 
         -- Freeze mutable vector of parameters. The frozen version is
-        -- then supplied to external update function provided by user.
+        -- then supplied to external mkGrad function provided by user.
         frozen <- U.unsafeFreeze x
         notify frozen k
 
-        -- let grad = M.unionsWith (<+>) (map (update frozen) batch)
-        let grad = parUnions (map (update frozen) batch)
+        -- let grad = M.unionsWith (<+>) (map (mkGrad frozen) batch)
+        let grad = parUnions (map (mkGrad frozen) batch)
         addUp grad u
         scale (gain k) u
 
@@ -109,6 +126,7 @@ sgdM SgdArgs{..} notify update dataset x0 = do
 
 -- | Add up all gradients and store results in normal domain.
 {-# SPECIALIZE addUp :: Grad -> MVect IO -> IO () #-}
+{-# SPECIALIZE addUp :: Grad -> MVect (ST s) -> ST s () #-}
 addUp :: Prim.PrimMonad m => Grad -> MVect m -> m ()
 addUp grad v = do
     UM.set v 0
@@ -118,6 +136,7 @@ addUp grad v = do
 
 -- | Scale the vector by the given value.
 {-# SPECIALIZE scale :: Double -> MVect IO -> IO () #-}
+{-# SPECIALIZE scale :: Double -> MVect (ST s) -> ST s () #-}
 scale :: Prim.PrimMonad m => Double -> MVect m -> m ()
 scale c v = do
     forM_ [0 .. UM.length v - 1] $ \i -> do
@@ -127,6 +146,7 @@ scale c v = do
 -- | Apply gradient to the parameters vector, that is add the first vector to
 -- the second one.
 {-# SPECIALIZE apply :: MVect IO -> MVect IO -> IO () #-}
+{-# SPECIALIZE apply :: MVect (ST s) -> MVect (ST s) -> ST s () #-}
 apply :: Prim.PrimMonad m => MVect m -> MVect m -> m ()
 apply w v = do 
     forM_ [0 .. UM.length v - 1] $ \i -> do
@@ -134,7 +154,7 @@ apply w v = do
         y <- UM.unsafeRead w i
         UM.unsafeWrite v i (x + y)
 
-sample :: R.RandomGen g => g -> Int -> Data x -> ([x], g)
+sample :: R.RandomGen g => g -> Int -> Dataset x -> ([x], g)
 sample g 0 _       = ([], g)
 sample g n dataset =
     let (xs, g') = sample g (n-1) dataset

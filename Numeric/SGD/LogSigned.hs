@@ -18,8 +18,9 @@ instance NFData L.LogFloat
 
 -- | Signed real value in the logarithmic domain.
 data LogSigned = LogSigned
-    { pos :: {-# UNPACK #-} !L.LogFloat       -- ^ Positive component
-    , neg :: {-# UNPACK #-} !L.LogFloat }     -- ^ Negative component
+    { pos :: {-# UNPACK #-} !L.LogFloat     -- ^ Positive component
+    , neg :: {-# UNPACK #-} !L.LogFloat     -- ^ Negative component
+    }
 
 -- All fields are strict and unpacked.
 instance NFData LogSigned
