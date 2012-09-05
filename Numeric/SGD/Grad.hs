@@ -28,11 +28,6 @@ import Control.Monad.Par.Scheds.Direct (Par, runPar, spawn, get)
 
 import Numeric.SGD.LogSigned
 
--- -- | Signed number.
--- data Signed a
---     = Pos a     -- ^ Positive number
---     | Neg a     -- ^ Negative number
-
 -- | Gradient with nonzero values stored in a logarithmic domain.
 -- Since values equal to zero have no impact on the update phase
 -- of the SGD method, it is more efficient to not to store those
