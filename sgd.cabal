@@ -1,6 +1,6 @@
 Name:               sgd
 Version:            0.0.1
-Synopsis:           Stochastic gradient descent library.
+Synopsis:           Stochastic gradient descent
 License:            BSD3
 License-file:       LICENSE
 Copyright:          Copyright (c) 2012 IPI PAN

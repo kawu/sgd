@@ -1,5 +1,17 @@
 {-# LANGUAGE BangPatterns #-}
 
+-- | A gradient is represented by an IntMap from gradient indices
+-- to values. Elements with no associated values in the gradient
+-- are assumed to have a 0 value assigned. Such elements are
+-- not interesting: when adding the gradient to the vector of
+-- parameters, only nonzero elements are taken into account.
+-- 
+-- Each value associated with a gradient position is a pair of
+-- positive and negative components. They are stored separately
+-- to ensure high accuracy of computation results.
+-- Besides, both positive and negative components are stored
+-- in a logarithmic domain.
+
 module Numeric.SGD.Grad
 ( Grad (..)
 , Signed (..)
@@ -27,8 +39,8 @@ import Control.Monad.Par.Scheds.Direct (Par, runPar, spawn, get)
 instance NFData L.LogFloat
 
 -- | Gradient with positive and negative components in log domain.
--- It is represented by an IntMap from indices to nonzero values
--- and can be defined by the formula: v i = exp (pos i) - exp (neg i).
+-- It can be defined by a formula v i = exp (pos i) - exp (neg i).
+-- Only nonzero values are stored in the gradient.
 type Grad = M.IntMap (L.LogFloat, L.LogFloat)
 
 -- | Add two log-domain numbers.
@@ -52,10 +64,12 @@ add grad i y =
         True    -> (L.logFloat y, zero)
         False   -> (zero, L.logFloat (-y))
 
+-- | Signed number.
 data Signed a
     = Pos a     -- ^ Positive number
     | Neg a     -- ^ Negative number
 
+-- | Add log-domain, singed number to the gradient at the given position.
 {-# INLINE addL #-}
 addL :: Grad -> Int -> Signed L.LogFloat -> Grad
 addL grad i (Pos x) = addPosL grad i x
@@ -71,18 +85,25 @@ addPosL grad i y = M.insertWith' (<+>) i (y, zero) grad
 addNegL :: Grad -> Int -> L.LogFloat -> Grad
 addNegL grad i y = M.insertWith' (<+>) i (zero, y) grad
 
+-- | Construct gradient from a list of (index, value) pairs.
+-- All values from the list are added at respective gradient
+-- positions.
 {-# INLINE fromList #-}
 fromList :: [(Int, Double)] -> Grad
 fromList =
     let ins grad (i, y) = add grad i y
     in  foldl' ins empty
 
+-- | Construct gradient from a list of (index, signed, log-domain
+-- number) pairs.  All values from the list are added at respective
+-- gradient positions.
 {-# INLINE fromLogList #-}
 fromLogList :: [(Int, Signed L.LogFloat)] -> Grad
 fromLogList =
     let ins grad (i, y) = addL grad i y
     in  foldl' ins empty
 
+-- | Collect nonzero gradient components with values in normal domain.
 {-# INLINE toList #-}
 toList :: Grad -> [(Int, Double)]
 toList =
@@ -90,6 +111,7 @@ toList =
             (i, L.fromLogFloat pos - L.fromLogFloat neg)
     in  map toNorm . M.assocs
 
+-- | Empty gradient, i.e. with all elements set to 0.
 {-# INLINE empty #-}
 empty :: Grad
 empty = M.empty
@@ -100,6 +122,7 @@ parUnions :: [Grad] -> Grad
 parUnions [] = error "parUnions: empty list"
 parUnions xs = runPar (parUnionsP xs)
 
+-- | Parallel unoins in the Par monad.
 parUnionsP :: [Grad] -> Par Grad
 parUnionsP [x] = return x
 parUnionsP zs  = do

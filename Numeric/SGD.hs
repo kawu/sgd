@@ -1,5 +1,14 @@
 {-# LANGUAGE RecordWildCards #-}
 
+-- | Stochastic gradient descent implementation using mutable
+-- vectors for efficient update of the parameters vector.
+-- A user is provided with the immutable version of parameters vector
+-- so he is able to compute the gradient outside the IO/ST monad.
+-- Currently only the Gaussian priors are implemented.
+--
+-- This is a preliminary version of the SGD library and API may change
+-- in future versions.
+
 module Numeric.SGD
 ( SgdArgs (..)
 , sgdArgsDefault
@@ -18,19 +27,21 @@ import qualified Control.Monad.Primitive as Prim
 
 import Numeric.SGD.Grad
 
+-- | SGD parameters controlling the learning process.
 data SgdArgs = SgdArgs
-    -- | Size of the batch.
-    { batchSize :: Int
-    -- | Regularization variance.
+    { -- | Size of the batch
+      batchSize :: Int
+    -- | Regularization variance
     , regVar    :: Double
-    -- | Number of iterations.
+    -- | Number of iterations
     , iterNum   :: Double
-    -- | Initial gain parameter.
+    -- | Initial gain parameter
     , gain0     :: Double
     -- | After how many iterations over the entire dataset
-    -- the gain parameter is halved.
+    -- the gain parameter is halved
     , tau       :: Double }
 
+-- | Default SGD parameter values.
 sgdArgsDefault :: SgdArgs
 sgdArgsDefault = SgdArgs
     { batchSize = 30
@@ -48,25 +59,21 @@ type Para       = U.Vector Double
 -- | Type synonym for mutable vector with Double values.
 type MVect m    = UM.MVector (Prim.PrimState m) Double
 
+-- | Monadic version of the stochastic gradient descent method.
+-- A notification function can be used to provide user with
+-- information about the progress of the learning.
 {-# SPECIALIZE sgdM :: SgdArgs
                     -> (Para -> Int -> IO ())
                     -> (Para -> x -> Grad)
                     -> Data x -> Para -> IO Para #-}
 sgdM
     :: (Applicative m, Prim.PrimMonad m)
-    -- | SGD parameter values.
-    => SgdArgs
-    -- | Notify every update.
-    -> (Para -> Int -> m ())
-    -- | Gradient update with respect to current point 
-    -- and the x dataset element.
-    -> (Para -> x -> Grad)
-    -- | Dataset.
-    -> Data x
-    -- | Starting point.
-    -> Para
-    -- | SGD result.
-    -> m Para
+    => SgdArgs              -- ^ SGD parameter values
+    -> (Para -> Int -> m ())    -- ^ Notification run every update
+    -> (Para -> x -> Grad)  -- ^ Gradient update
+    -> Data x               -- ^ Dataset
+    -> Para                 -- ^ Starting point
+    -> m Para               -- ^ SGD result
 sgdM SgdArgs{..} notify update dataset x0 = do
     u <- UM.new (U.length x0)
     doIt u 0 (R.mkStdGen 0) =<< U.thaw x0
@@ -86,7 +93,7 @@ sgdM SgdArgs{..} notify update dataset x0 = do
       | otherwise = do
         let (batch, stdGen') = sample stdGen batchSize dataset
 
-        -- | Freeze mutable vector of parameters. The frozen version is
+        -- Freeze mutable vector of parameters. The frozen version is
         -- then supplied to external update function provided by user.
         frozen <- U.unsafeFreeze x
         notify frozen k
