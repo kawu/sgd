@@ -135,7 +135,7 @@ apply w v = do
         UM.unsafeWrite v i (x + y)
 
 sample :: R.RandomGen g => g -> Int -> Data x -> ([x], g)
-sample g 0 dataset = ([], g)
+sample g 0 _       = ([], g)
 sample g n dataset =
     let (xs, g') = sample g (n-1) dataset
         (i, g'') = R.next g'

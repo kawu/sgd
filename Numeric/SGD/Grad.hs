@@ -13,7 +13,7 @@
 -- in a logarithmic domain.
 
 module Numeric.SGD.Grad
-( Grad (..)
+( Grad
 , Signed (..)
 , empty
 , add
