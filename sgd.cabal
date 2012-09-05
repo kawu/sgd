@@ -2,7 +2,11 @@ name:               sgd
 version:            0.0.1
 synopsis:           Stochastic gradient descent
 description:
-    Implementation of the Stochastic Gradient Descent optimization method.
+    Implementation of a Stochastic Gradient Descent optimization method.
+    See examples directory in the source package for examples of usage.
+    .
+    It is a preliminary implementation of the SGD method and API may change
+    in future versions.
 license:            BSD3
 license-file:       LICENSE
 cabal-version:      >= 1.6
@@ -14,9 +18,11 @@ category:           Math, Algorithms
 homepage:           https://github.com/kawu/sgd
 build-type:         Simple
 
+extra-source-files: examples/example1.hs
+
 library
     build-depends:
-        base
+        base >= 4 && < 5
       , containers
       , vector
       , random
@@ -26,6 +32,7 @@ library
 
     exposed-modules:
         Numeric.SGD
+      , Numeric.SGD.LogSigned
       , Numeric.SGD.Grad
 
     ghc-options: -Wall -O2
