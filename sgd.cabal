@@ -1,0 +1,18 @@
+Name:               sgd
+Version:            0.0.1
+Synopsis:           Stochastic gradient descent library.
+License:            BSD3
+License-file:       LICENSE
+Copyright:          Copyright (c) 2012 IPI PAN
+Author:             Jakub Waszczuk
+Maintainer:         waszczuk.kuba@gmail.com
+Build-type:         Simple
+Exposed-modules:    Numeric.SGD
+                  , Numeric.SGD.Grad
+Build-Depends:      base
+                  , containers
+                  , vector
+                  , random
+		  , primitive
+		  , logfloat
+		  , monad-par
