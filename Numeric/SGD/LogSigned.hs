@@ -9,9 +9,11 @@ module Numeric.SGD.LogSigned
 , fromPos
 , fromNeg
 , toNorm
+, toLogFloat
 ) where
 
 import qualified Data.Number.LogFloat as L
+import Data.Function (on)
 import Control.Monad.Par (NFData)
 
 instance NFData L.LogFloat
@@ -20,7 +22,13 @@ instance NFData L.LogFloat
 data LogSigned = LogSigned
     { pos :: {-# UNPACK #-} !L.LogFloat     -- ^ Positive component
     , neg :: {-# UNPACK #-} !L.LogFloat     -- ^ Negative component
-    }
+    } deriving Show
+
+instance Eq LogSigned where
+    (==) = (==) `on` toLogFloat
+
+instance Ord LogSigned where
+    compare = compare `on` toLogFloat
 
 -- All fields are strict and unpacked.
 instance NFData LogSigned
@@ -47,6 +55,14 @@ fromNeg x = LogSigned zero x
 {-# INLINE toNorm #-}
 toNorm :: LogSigned -> Double
 toNorm (LogSigned x y) = L.fromLogFloat x - L.fromLogFloat y
+
+-- | Change the 'LogSigned' to either negative 'Left' 'L.LogFloat'
+-- or positive 'Right' 'L.LogFloat'.
+toLogFloat :: LogSigned -> Either L.LogFloat L.LogFloat
+toLogFloat x = case signum x of
+    -1  -> Left  $ neg x - pos x
+    1   -> Right $ pos x - neg x
+    _   -> Right $ L.logFloat (0 :: Double)
 
 instance Num LogSigned where
     LogSigned x y + LogSigned x' y' =

@@ -19,7 +19,6 @@ module Numeric.SGD
 , module Numeric.SGD.Grad
 ) where
 
-import Control.Applicative (Applicative)
 import Control.Monad (forM_)
 import Control.Monad.ST (ST, runST)
 import qualified System.Random as R
@@ -84,7 +83,7 @@ sgd sgdArgs mkGrad dataset x0 =
                     -> (Para -> x -> Grad)
                     -> Dataset x -> Para -> ST s Para #-}
 sgdM
-    :: (Applicative m, Prim.PrimMonad m)
+    :: (Prim.PrimMonad m)
     => SgdArgs              -- ^ SGD parameter values
     -> (Para -> Int -> m ())    -- ^ Notification run every update
     -> (Para -> x -> Grad)  -- ^ Gradient for dataset element

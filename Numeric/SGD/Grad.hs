@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -- | A gradient is represented by an IntMap from gradient indices
 -- to values. Elements with no associated values in the gradient
 -- are assumed to have a 0 value assigned. Such elements are
@@ -34,15 +36,28 @@ import Numeric.SGD.LogSigned
 -- components in the gradient.
 type Grad = M.IntMap LogSigned
 
+{-# INLINE insertWith #-}
+insertWith :: (a -> a -> a) -> M.Key -> a -> M.IntMap a -> M.IntMap a
+#if MIN_VERSION_containers(0,4,1)
+insertWith = M.insertWith'
+#else
+insertWith f k x m = case M.lookup k m of
+    Just y  ->
+        let x' = f x y
+        in  x' `seq` M.insert k x' m
+    Nothing -> x `seq` M.insert k x m
+#endif
+
 -- | Add normal-domain double to the gradient at the given position.
 {-# INLINE add #-}
 add :: Grad -> Int -> Double -> Grad
-add grad i y = M.insertWith' (+) i (logSigned y) grad 
+add grad i y = insertWith (+) i (logSigned y) grad 
+
 
 -- | Add log-domain, singed number to the gradient at the given position.
 {-# INLINE addL #-}
 addL :: Grad -> Int -> LogSigned -> Grad
-addL grad i y = M.insertWith' (+) i y grad 
+addL grad i y = insertWith (+) i y grad 
 
 -- | Construct gradient from a list of (index, value) pairs.
 -- All values from the list are added at respective gradient
@@ -78,6 +93,7 @@ empty = M.empty
 -- Experimental version.
 parUnions :: [Grad] -> Grad
 parUnions [] = error "parUnions: empty list"
+#if MIN_VERSION_containers(0,4,2)
 parUnions xs = runPar (parUnionsP xs)
 
 -- | Parallel unoins in the Par monad.
@@ -94,3 +110,6 @@ parUnionsP zs  = do
     split (x:y:rest)  =
         let (xs, ys) = split rest
         in  (x:xs, y:ys)
+#else
+parUnions xs = M.unions xs
+#endif
