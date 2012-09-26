@@ -23,10 +23,13 @@ module Numeric.SGD.Grad
 , parUnions
 ) where
 
-import Control.Applicative ((<$>), (<*>))
 import Data.List (foldl')
 import qualified Data.IntMap as M
+#if MIN_VERSION_containers(0,4,2)
+import Control.Applicative ((<$>), (<*>))
 import Control.Monad.Par.Scheds.Direct (Par, runPar, spawn, get)
+#else
+#endif
 
 import Numeric.SGD.LogSigned
 

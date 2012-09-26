@@ -14,9 +14,7 @@ module Numeric.SGD.LogSigned
 
 import qualified Data.Number.LogFloat as L
 import Data.Function (on)
-import Control.Monad.Par (NFData)
-
-instance NFData L.LogFloat
+import Control.DeepSeq (NFData(..))
 
 -- | Signed real value in the logarithmic domain.
 data LogSigned = LogSigned
@@ -31,7 +29,8 @@ instance Ord LogSigned where
     compare = compare `on` toLogFloat
 
 -- All fields are strict and unpacked.
-instance NFData LogSigned
+instance NFData LogSigned where
+    rnf (LogSigned p q) = p `seq` q `seq` ()
 
 -- | Smart LogSigned constructor.
 {-# INLINE logSigned #-}

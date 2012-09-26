@@ -29,6 +29,7 @@ library
       , primitive
       , logfloat
       , monad-par
+      , deepseq
 
     exposed-modules:
         Numeric.SGD
