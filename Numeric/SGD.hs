@@ -114,7 +114,7 @@ sgdM SgdArgs{..} notify mkGrad dataset x0 = do
         frozen <- U.unsafeFreeze x
         notify frozen k
 
-        -- let grad = M.unionsWith (<+>) (map (mkGrad frozen) batch)
+        -- let grad = M.unions (map (mkGrad frozen) batch)
         let grad = parUnions (map (mkGrad frozen) batch)
         addUp grad u
         scale (gain k) u

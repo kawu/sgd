@@ -24,12 +24,15 @@ module Numeric.SGD.Grad
 ) where
 
 import Data.List (foldl')
-import qualified Data.IntMap as M
-#if MIN_VERSION_containers(0,4,2)
 import Control.Applicative ((<$>), (<*>))
-import Control.Monad.Par.Scheds.Direct (Par, runPar, spawn, get)
+import Control.Monad.Par.Scheds.Direct (Par, runPar, get)
+#if MIN_VERSION_containers(0,4,2)
+import Control.Monad.Par.Scheds.Direct (spawn)
 #else
+import Control.DeepSeq (deepseq)
+import Control.Monad.Par.Scheds.Direct (spawn_)
 #endif
+import qualified Data.IntMap as M
 
 import Numeric.SGD.LogSigned
 
@@ -44,11 +47,19 @@ insertWith :: (a -> a -> a) -> M.Key -> a -> M.IntMap a -> M.IntMap a
 #if MIN_VERSION_containers(0,4,1)
 insertWith = M.insertWith'
 #else
-insertWith f k x m = case M.lookup k m of
-    Just y  ->
-        let x' = f x y
-        in  x' `seq` M.insert k x' m
-    Nothing -> x `seq` M.insert k x m
+insertWith f k x m = 
+    M.alter g k m
+  where
+    g my = case my of
+        Nothing -> Just x
+        Just y  ->
+            let z = f x y
+            in  z `seq` Just z
+-- insertWith f k x m = case M.lookup k m of
+--     Just y  ->
+--         let x' = f x y
+--         in  x' `seq` M.insert k x' m
+--     Nothing -> x `seq` M.insert k x m
 #endif
 
 -- | Add normal-domain double to the gradient at the given position.
@@ -96,23 +107,26 @@ empty = M.empty
 -- Experimental version.
 parUnions :: [Grad] -> Grad
 parUnions [] = error "parUnions: empty list"
-#if MIN_VERSION_containers(0,4,2)
 parUnions xs = runPar (parUnionsP xs)
 
--- | Parallel unoins in the Par monad.
+-- | Parallel unions in the Par monad.
 parUnionsP :: [Grad] -> Par Grad
 parUnionsP [x] = return x
 parUnionsP zs  = do
     let (xs, ys) = split zs
+#if MIN_VERSION_containers(0,4,2)
     xsP <- spawn (parUnionsP xs)
     ysP <- spawn (parUnionsP ys)
     M.unionWith (+) <$> get xsP <*> get ysP
+#else
+    xsP <- spawn_ (parUnionsP xs)
+    ysP <- spawn_ (parUnionsP ys)
+    x <- M.unionWith (+) <$> get xsP <*> get ysP
+    M.elems x `deepseq` return x
+#endif
   where
     split []        = ([], [])
     split (x:[])    = ([x], [])
     split (x:y:rest)  =
         let (xs, ys) = split rest
         in  (x:xs, y:ys)
-#else
-parUnions xs = M.unions xs
-#endif
