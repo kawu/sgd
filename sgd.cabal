@@ -4,6 +4,8 @@ synopsis:           Stochastic gradient descent
 description:
     Implementation of a Stochastic Gradient Descent optimization method.
     See examples directory in the source package for examples of usage.
+    The library provides different gradient backends which can be chosen
+    depending on the particular usecase.
     .
     It is a preliminary implementation of the SGD method and API may change
     in future versions.
