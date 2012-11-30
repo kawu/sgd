@@ -66,27 +66,20 @@ toLogFloat x = case signum x of
 instance Num LogSigned where
     LogSigned x y + LogSigned x' y' =
         LogSigned (x + x') (y + y')
-    {-# INLINE (+) #-}
     LogSigned x y * LogSigned x' y' =
         LogSigned (x*x' + y*y') (x*y' + y*x')
-    {-# INLINE (*) #-}
     LogSigned x y - LogSigned x' y' =
         LogSigned (x + y') (y + x')
-    {-# INLINE (-) #-}
     negate  (LogSigned x y) = LogSigned y x
-    {-# INLINE negate #-}
     abs     (LogSigned x y)
         | x >= y    = LogSigned x y
         | otherwise = LogSigned y x
-    {-# INLINE abs #-}
     signum (LogSigned x y)
         | x > y     =  1
         | x < y     = -1
         | otherwise =  0
-    {-# INLINE signum #-}
     fromInteger = logSigned . fromInteger
-    {-# INLINE fromInteger #-}
 
+{-# INLINE zero #-}
 zero :: L.LogFloat
 zero = L.logFloat (0 :: Double)
-{-# INLINE zero #-}

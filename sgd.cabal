@@ -1,5 +1,5 @@
 name:               sgd
-version:            0.3.0
+version:            0.2.2
 synopsis:           Stochastic gradient descent
 description:
     Implementation of a Stochastic Gradient Descent optimization method.
@@ -23,21 +23,18 @@ extra-source-files: examples/example1.hs
 library
     build-depends:
         base >= 4 && < 5
-      , containers >= 0.4.2 && < 0.6
+      , containers
       , vector
       , random
+      , primitive
       , logfloat
       , monad-par
       , deepseq
-      , mtl
-      , async
 
     exposed-modules:
         Numeric.SGD
       , Numeric.SGD.LogSigned
       , Numeric.SGD.Grad
-      , Numeric.SGD.Grad.Map
-      , Numeric.SGD.Grad.Vector
 
     ghc-options: -Wall -O2
 
