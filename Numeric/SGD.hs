@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 
+
 -- | Stochastic gradient descent implementation using mutable
 -- vectors for efficient update of the parameters vector.
 -- A user is provided with the immutable vector of parameters
@@ -8,6 +9,7 @@
 --
 -- This is a preliminary version of the SGD library and API may change
 -- in future versions.
+
 
 module Numeric.SGD
 ( SgdArgs (..)
@@ -18,14 +20,16 @@ module Numeric.SGD
 , module Numeric.SGD.Dataset
 ) where
 
-import Control.Monad (forM_)
+
+import           Control.Monad (forM_)
 import qualified System.Random as R
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector.Unboxed.Mutable as UM
 import qualified Control.Monad.Primitive as Prim
 
-import Numeric.SGD.Grad
-import Numeric.SGD.Dataset
+import           Numeric.SGD.Grad
+import           Numeric.SGD.Dataset
+
 
 -- | SGD parameters controlling the learning process.
 data SgdArgs = SgdArgs
@@ -41,6 +45,7 @@ data SgdArgs = SgdArgs
     -- the gain parameter is halved
     , tau       :: Double }
 
+
 -- | Default SGD parameter values.
 sgdArgsDefault :: SgdArgs
 sgdArgsDefault = SgdArgs
@@ -50,11 +55,14 @@ sgdArgsDefault = SgdArgs
     , gain0     = 1
     , tau       = 5 }
 
+
 -- | Vector of parameters.
 type Para       = U.Vector Double 
 
+
 -- | Type synonym for mutable vector with Double values.
 type MVect      = UM.MVector (Prim.PrimState IO) Double
+
 
 -- | A stochastic gradient descent method.
 -- A notification function can be used to provide user with
@@ -70,9 +78,10 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
     u <- UM.new (U.length x0)
     doIt u 0 (R.mkStdGen 0) =<< U.thaw x0
   where
-    -- | Gain in k-th iteration.
+    -- Gain in k-th iteration.
     gain k = (gain0 * tau) / (tau + done k)
-    -- | Number of completed iterations over the full dataset.
+
+    -- Number of completed iterations over the full dataset.
     done k
         = fromIntegral (k * batchSize)
         / fromIntegral (size dataset)
@@ -99,6 +108,7 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
         apply u x'
         doIt u (k+1) stdGen' x'
 
+
 -- | Add up all gradients and store results in normal domain.
 addUp :: Grad -> MVect -> IO ()
 addUp grad v = do
@@ -107,12 +117,14 @@ addUp grad v = do
         y <- UM.unsafeRead v i
         UM.unsafeWrite v i (x + y)
 
+
 -- | Scale the vector by the given value.
 scale :: Double -> MVect -> IO ()
 scale c v = do
     forM_ [0 .. UM.length v - 1] $ \i -> do
         y <- UM.unsafeRead v i
         UM.unsafeWrite v i (c * y)
+
 
 -- | Apply gradient to the parameters vector, that is add the first vector to
 -- the second one.
