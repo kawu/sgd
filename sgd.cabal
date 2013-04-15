@@ -1,5 +1,5 @@
 name:               sgd
-version:            0.2.2
+version:            0.3
 synopsis:           Stochastic gradient descent
 description:
     Implementation of a Stochastic Gradient Descent optimization method.
@@ -30,9 +30,14 @@ library
       , logfloat
       , monad-par
       , deepseq
+      , binary
+      , mtl
+      , filepath
+      , temporary
 
     exposed-modules:
         Numeric.SGD
+      , Numeric.SGD.Dataset
       , Numeric.SGD.LogSigned
       , Numeric.SGD.Grad
 
