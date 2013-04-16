@@ -94,7 +94,8 @@ withDisk xs handler = withTempDirectory "." ".sgd" $ \tmpDir -> do
 
 
 -- | Use disk or vector dataset representation depending on
--- the given argument. 
+-- the first argument: when `True`, use `withDisk`, otherwise
+-- use `withVect`.
 withData :: Binary a => Bool -> [a] -> (Dataset a -> IO b) -> IO b
 withData x = case x of
     True    -> withDisk
