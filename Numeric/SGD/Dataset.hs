@@ -85,7 +85,7 @@ withVect xs handler =
 -- | Construct dataset from a list of elements, store it on a disk
 -- and run the given handler.
 withDisk :: Binary a => [a] -> (Dataset a -> IO b) -> IO b
-withDisk xs handler = withTempDirectory "." ".data" $ \tmpDir -> do
+withDisk xs handler = withTempDirectory "." ".sgd" $ \tmpDir -> do
     n <- flip S.execStateT 0 $ forM_ (zip xs [0 :: Int ..]) $ \(x, ix) -> do
         S.lift $ encodeFile (tmpDir </> show ix) x
         S.modify (+1)
