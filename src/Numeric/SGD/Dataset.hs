@@ -19,7 +19,9 @@ module Numeric.SGD.Dataset
 
 
 import           Control.Monad (forM_)
-import           Data.Binary (Binary, encodeFile, decodeFile)
+import           Data.Binary (Binary, encodeFile, decode)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import           System.IO.Unsafe (unsafeInterleaveIO)
 import           System.IO.Temp (withTempDirectory)
 import           System.FilePath ((</>))
@@ -86,10 +88,17 @@ withVect xs handler =
 -- and run the given handler.
 withDisk :: Binary a => [a] -> (Dataset a -> IO b) -> IO b
 withDisk xs handler = withTempDirectory "." ".sgd" $ \tmpDir -> do
+    -- We use state monad to compute the number of dataset elements. 
     n <- flip S.execStateT 0 $ forM_ (zip xs [0 :: Int ..]) $ \(x, ix) -> do
         S.lift $ encodeFile (tmpDir </> show ix) x
         S.modify (+1)
-    let at ix = decodeFile (tmpDir </> show ix)
+
+    -- We need to avoid decodeFile laziness when using some older
+    -- versions of the binary library.
+    let at ix = do
+        cs <- B.readFile (tmpDir </> show ix)
+        return . decode $ BL.fromChunks [cs]
+
     handler $ Dataset {size = n, elemAt = at}
 
 

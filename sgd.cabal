@@ -1,5 +1,5 @@
 name:               sgd
-version:            0.3
+version:            0.3.1
 synopsis:           Stochastic gradient descent
 description:
     Implementation of a Stochastic Gradient Descent optimization method.
@@ -21,6 +21,8 @@ build-type:         Simple
 extra-source-files: examples/example1.hs
 
 library
+    hs-source-dirs: src
+
     build-depends:
         base >= 4 && < 5
       , containers
@@ -31,6 +33,7 @@ library
       , monad-par
       , deepseq
       , binary
+      , bytestring
       , mtl
       , filepath
       , temporary
