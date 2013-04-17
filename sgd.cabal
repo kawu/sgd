@@ -1,5 +1,5 @@
 name:               sgd
-version:            0.3.1
+version:            0.3.2
 synopsis:           Stochastic gradient descent
 description:
     Implementation of a Stochastic Gradient Descent optimization method.
@@ -37,6 +37,7 @@ library
       , mtl
       , filepath
       , temporary
+      , lazy-io
 
     exposed-modules:
         Numeric.SGD

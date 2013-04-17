@@ -22,11 +22,11 @@ import           Control.Monad (forM_)
 import           Data.Binary (Binary, encodeFile, decode)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import           System.IO.Unsafe (unsafeInterleaveIO)
 import           System.IO.Temp (withTempDirectory)
 import           System.FilePath ((</>))
 import qualified System.Random as R
 import qualified Data.Vector as V
+import qualified Control.Monad.LazyIO as LazyIO
 import qualified Control.Monad.State.Strict as S
 
 
@@ -46,7 +46,7 @@ data Dataset a = Dataset {
 
 -- | Lazily load dataset from a disk.
 loadData :: Dataset a -> IO [a]
-loadData Dataset{..} = lazyMapM elemAt [0 .. size - 1]
+loadData Dataset{..} = LazyIO.mapM elemAt [0 .. size - 1]
 
 
 -- | A dataset sample of the given size.
@@ -57,14 +57,6 @@ sample g n dataset = do
     let (i, g'') = R.next g'
     x <- dataset `elemAt` (i `mod` size dataset)
     return (x:xs, g'')
-
-
-lazyMapM :: (a -> IO b) -> [a] -> IO [b]
-lazyMapM f (x:xs) = do
-    y <- f x
-    ys <- unsafeInterleaveIO $ lazyMapM f xs
-    return (y:ys)
-lazyMapM _ [] = return []
 
 
 -------------------------------------------
