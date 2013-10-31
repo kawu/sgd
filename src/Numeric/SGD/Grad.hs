@@ -25,12 +25,12 @@ module Numeric.SGD.Grad
 
 import Data.List (foldl')
 import Control.Applicative ((<$>), (<*>))
-import Control.Monad.Par.Scheds.Direct (Par, runPar, get)
+import Control.Monad.Par (Par, runPar, get)
 #if MIN_VERSION_containers(0,4,2)
-import Control.Monad.Par.Scheds.Direct (spawn)
+import Control.Monad.Par (spawn)
 #else
 import Control.DeepSeq (deepseq)
-import Control.Monad.Par.Scheds.Direct (spawn_)
+import Control.Monad.Par (spawn_)
 #endif
 import qualified Data.IntMap as M
 
