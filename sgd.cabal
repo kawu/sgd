@@ -1,5 +1,5 @@
 name:               sgd
-version:            0.3.3
+version:            0.3.4
 synopsis:           Stochastic gradient descent
 description:
     Implementation of a Stochastic Gradient Descent optimization method.
@@ -34,7 +34,7 @@ library
       , deepseq         >= 1.3      && < 1.4
       , binary          >= 0.5      && < 0.6
       , bytestring      >= 0.9      && < 0.11
-      , mtl             >= 2.1      && < 2.2
+      , mtl             >= 2.0      && < 2.2
       , filepath        >= 1.3      && < 1.4
       , temporary       >= 1.1      && < 1.2
       , lazy-io         >= 0.1      && < 0.2
