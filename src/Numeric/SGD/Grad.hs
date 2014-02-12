@@ -32,7 +32,11 @@ import Control.Monad.Par (spawn)
 import Control.DeepSeq (deepseq)
 import Control.Monad.Par (spawn_)
 #endif
+#if MIN_VERSION_containers(0,5,0)
+import qualified Data.IntMap.Strict as M
+#else
 import qualified Data.IntMap as M
+#endif
 
 import Numeric.SGD.LogSigned
 
@@ -44,7 +48,9 @@ type Grad = M.IntMap LogSigned
 
 {-# INLINE insertWith #-}
 insertWith :: (a -> a -> a) -> M.Key -> a -> M.IntMap a -> M.IntMap a
-#if MIN_VERSION_containers(0,4,1)
+#if MIN_VERSION_containers(0,5,0)
+insertWith = M.insertWith
+#elif MIN_VERSION_containers(0,4,1)
 insertWith = M.insertWith'
 #else
 insertWith f k x m = 
@@ -55,11 +61,6 @@ insertWith f k x m =
         Just y  ->
             let z = f x y
             in  z `seq` Just z
--- insertWith f k x m = case M.lookup k m of
---     Just y  ->
---         let x' = f x y
---         in  x' `seq` M.insert k x' m
---     Nothing -> x `seq` M.insert k x m
 #endif
 
 -- | Add normal-domain double to the gradient at the given position.
