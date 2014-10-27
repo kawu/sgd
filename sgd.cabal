@@ -1,5 +1,5 @@
 name:               sgd
-version:            0.3.5
+version:            0.3.6
 synopsis:           Stochastic gradient descent
 description:
     Implementation of a Stochastic Gradient Descent optimization method.
