@@ -57,7 +57,7 @@ sgdArgsDefault = SgdArgs
 
 
 -- | Vector of parameters.
-type Para       = U.Vector Double 
+type Para       = U.Vector Double
 
 
 -- | Type synonym for mutable vector with Double values.
@@ -86,6 +86,14 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
         = fromIntegral (k * batchSize)
         / fromIntegral (size dataset)
 
+    -- Regularization (or Guassian prior, it seems)
+    regularization k = regCoef
+      where
+        regCoef = 1.0 - iVar2 * coef * gain k
+        iVar2 = 1.0 / (regVar ^ 2)
+        coef = fromIntegral batchSize
+             / fromIntegral (size dataset)
+
     doIt u k stdGen x
       | done k > iterNum = do
         frozen <- U.unsafeFreeze x
@@ -105,7 +113,8 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
         scale (gain k) u
 
         x' <- U.unsafeThaw frozen
-        apply u x'
+        u `addTo` x'
+        scale (regularization k) x'
         doIt u (k+1) stdGen' x'
 
 
@@ -128,8 +137,8 @@ scale c v = do
 
 -- | Apply gradient to the parameters vector, that is add the first vector to
 -- the second one.
-apply :: MVect -> MVect -> IO ()
-apply w v = do 
+addTo :: MVect -> MVect -> IO ()
+addTo w v = do
     forM_ [0 .. UM.length v - 1] $ \i -> do
         x <- UM.unsafeRead v i
         y <- UM.unsafeRead w i
