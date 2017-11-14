@@ -14,6 +14,10 @@
 The parameters for the step k+1 are computed as follows:
 * v<sub>k+1</sub> = v<sub>k</sub> + s<sub>k</sub> * u<sub>k</sub>
 
+Note that the above equation relies on the fact that the gradient computed over
+the entire dataset is equal to the sum of the gradients computed separately for
+the individual sentences in this dataset.
+
 # With regularization
 
 Regularization parameter after full dataset pass:
