@@ -4,8 +4,9 @@
   elements are used to estimate the gradient to follow
 * v<sub>k</sub> -- vector of model parameters (k-th step)
 * u<sub>k</sub> -- gradient vector (k-th step)
-* s<sub>k</sub> -- step size (calculated on the basis of the initial step size
-  `gain0` and `tau` arguments)
+* s<sub>k</sub> -- step size, calculated on the basis of `gain0` (initial step
+  size) and `tau` arguments (it decreases to `gain0` / 2 after `tau` passes
+  over the full dataset)
 * `regVar` -- regularization variance
 
 # No regularization
