@@ -21,7 +21,7 @@ module Numeric.SGD
 ) where
 
 
-import           Control.Monad (forM_)
+import           Control.Monad (forM_) -- , when)
 import qualified System.Random as R
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector.Unboxed.Mutable as UM
@@ -75,22 +75,32 @@ sgd
     -> Para                     -- ^ Starting point
     -> IO Para                  -- ^ SGD result
 sgd SgdArgs{..} notify mkGrad dataset x0 = do
-    u <- UM.new (U.length x0)
-    doIt u 0 (R.mkStdGen 0) =<< U.thaw x0
+  u <- UM.new (U.length x0)
+  doIt u 0 (R.mkStdGen 0) =<< U.thaw x0
   where
     -- Gain in k-th iteration.
     gain k = (gain0 * tau) / (tau + done k)
 
     -- Number of completed iterations over the full dataset.
+    done :: Int -> Double
     done k
         = fromIntegral (k * batchSize)
         / fromIntegral (size dataset)
+    doneTotal :: Int -> Int
+    doneTotal = floor . done
 
-    -- Regularization (or Guassian prior, it seems)
+--     -- Regularization (Guassian prior) after a full dataset pass
+--     regularization k = regCoef
+--       where
+--         regCoef = 1.0 - iVar * coef * gain k
+--         iVar = 1.0 / regVar
+--         coef = 1.0
+
+    -- Regularization (Guassian prior)
     regularization k = regCoef
       where
-        regCoef = 1.0 - iVar2 * coef * gain k
-        iVar2 = 1.0 / (regVar ^ 2)
+        regCoef = (1.0 - gain k * iVar) ** coef
+        iVar = 1.0 / regVar
         coef = fromIntegral batchSize
              / fromIntegral (size dataset)
 
@@ -101,6 +111,14 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
         return frozen
       | otherwise = do
         (batch, stdGen') <- sample stdGen batchSize dataset
+
+        -- Regularization
+        -- when (doneTotal (k - 1) /= doneTotal k) $ do
+        --   <- we now apply regularization each step rather than each
+        --      dataset pass
+        let regParam = regularization k
+        -- putStrLn $ "\nApplying regularization (params *= " ++ show regParam ++ ")"
+        scale regParam x
 
         -- Freeze mutable vector of parameters. The frozen version is
         -- then supplied to external mkGrad function provided by user.
@@ -114,7 +132,6 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
 
         x' <- U.unsafeThaw frozen
         u `addTo` x'
-        scale (regularization k) x'
         doIt u (k+1) stdGen' x'
 
 
