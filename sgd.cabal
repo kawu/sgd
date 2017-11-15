@@ -41,6 +41,7 @@ library
 
     exposed-modules:
         Numeric.SGD
+      , Numeric.SGD.Momentum
       , Numeric.SGD.Dataset
       , Numeric.SGD.LogSigned
       , Numeric.SGD.Grad

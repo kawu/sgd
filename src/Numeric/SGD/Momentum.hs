@@ -1,17 +1,10 @@
 {-# LANGUAGE RecordWildCards #-}
 
 
--- | Stochastic gradient descent implementation using mutable
--- vectors for efficient update of the parameters vector.
--- A user is provided with the immutable vector of parameters
--- so he is able to compute the gradient outside of the IO monad.
--- Currently only the Gaussian priors are implemented.
---
--- This is a preliminary version of the SGD library and API may change
--- in future versions.
+-- | A version of `Numeric.SGD` extended with momentum.
 
 
-module Numeric.SGD
+module Numeric.SGD.Momentum
 ( SgdArgs (..)
 , sgdArgsDefault
 , Para
@@ -75,8 +68,17 @@ sgd
     -> Para                     -- ^ Starting point
     -> IO Para                  -- ^ SGD result
 sgd SgdArgs{..} notify mkGrad dataset x0 = do
+
+  putStrLn $ "Running momentum!"
+
+  -- A vector for the momentum gradient
+  momentum <- UM.new (U.length x0)
+
+  -- A worker vector for computing the actual gradients
   u <- UM.new (U.length x0)
-  doIt u 0 (R.mkStdGen 0) =<< U.thaw x0
+
+  doIt momentum u 0 (R.mkStdGen 0) =<< U.thaw x0
+
   where
     -- Gain in k-th iteration.
     gain k = (gain0 * tau) / (tau + done k)
@@ -97,44 +99,53 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
         coef = fromIntegral batchSize
              / fromIntegral (size dataset)
 
---     -- Regularization (Guassian prior) after a full dataset pass
---     regularization k = 1.0 - (gain k / regVar)
+    -- The gamma parameter. TODO: put in SgdArgs.
+    gamma = 0.9
 
-    doIt u k stdGen x
+    doIt momentum u k stdGen x
+
       | done k > iterNum = do
         frozen <- U.unsafeFreeze x
         notify frozen k
         return frozen
+
       | otherwise = do
+
+        -- Sample the dataset
         (batch, stdGen') <- sample stdGen batchSize dataset
 
-        -- Regularization
-        -- when (doneTotal (k - 1) /= doneTotal k) $ do
-        --   <- we now apply regularization each step rather than each
-        --      dataset pass
-        let regParam = regularization k
-        -- putStrLn $ "\nApplying regularization (params *= " ++ show regParam ++ ")"
-        scale regParam x
-
---         -- Regularization
---         when (doneTotal (k - 1) /= doneTotal k) $ do
---           let regParam = regularization k
---           putStrLn $ "\nApplying regularization (params *= " ++ show regParam ++ ")"
---           scale regParam x
+        -- Apply regularization to the parameters vector.
+        scale (regularization k) x
 
         -- Freeze mutable vector of parameters. The frozen version is
         -- then supplied to external mkGrad function provided by user.
         frozen <- U.unsafeFreeze x
         notify frozen k
 
-        -- let grad = M.unions (map (mkGrad frozen) batch)
+        -- Compute the gradient and scale it
         let grad = parUnions (map (mkGrad frozen) batch)
         addUp grad u
         scale (gain k) u
 
+        -- Compute the new momentum
+        updateMomentum gamma momentum u
+
         x' <- U.unsafeThaw frozen
-        u `addTo` x'
-        doIt u (k+1) stdGen' x'
+        momentum `addTo` x'
+        doIt momentum u (k+1) stdGen' x'
+
+
+-- | Compute the new momentum (gradient) vector.
+updateMomentum
+  :: Double -- ^ The gamma parameter
+  -> MVect  -- ^ The previous momentum
+  -> MVect  -- ^ The scaled current gradient
+  -> IO ()
+updateMomentum gamma momentum grad = do
+  forM_ [0 .. UM.length momentum - 1] $ \i -> do
+    x <- UM.unsafeRead momentum i
+    y <- UM.unsafeRead grad i
+    UM.unsafeWrite momentum i (gamma * x + y)
 
 
 -- | Add up all gradients and store results in normal domain.
@@ -149,16 +160,16 @@ addUp grad v = do
 -- | Scale the vector by the given value.
 scale :: Double -> MVect -> IO ()
 scale c v = do
-    forM_ [0 .. UM.length v - 1] $ \i -> do
-        y <- UM.unsafeRead v i
-        UM.unsafeWrite v i (c * y)
+  forM_ [0 .. UM.length v - 1] $ \i -> do
+    y <- UM.unsafeRead v i
+    UM.unsafeWrite v i (c * y)
 
 
 -- | Apply gradient to the parameters vector, that is add the first vector to
 -- the second one.
 addTo :: MVect -> MVect -> IO ()
 addTo w v = do
-    forM_ [0 .. UM.length v - 1] $ \i -> do
-        x <- UM.unsafeRead v i
-        y <- UM.unsafeRead w i
-        UM.unsafeWrite v i (x + y)
+  forM_ [0 .. UM.length v - 1] $ \i -> do
+    x <- UM.unsafeRead v i
+    y <- UM.unsafeRead w i
+    UM.unsafeWrite v i (x + y)
