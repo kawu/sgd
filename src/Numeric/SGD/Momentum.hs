@@ -91,13 +91,13 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
     doneTotal :: Int -> Int
     doneTotal = floor . done
 
-    -- Regularization (Guassian prior)
-    regularization k = regCoef
+    -- Regularization (Guassian prior) parameter
+    regularizationParam = regCoef
       where
-        regCoef = (1.0 - gain k * iVar) ** coef
+        regCoef = iVar ** coef
         iVar = 1.0 / regVar
-        coef = fromIntegral batchSize
-             / fromIntegral (size dataset)
+        coef = fromIntegral (size dataset)
+             / fromIntegral batchSize
 
     -- The gamma parameter. TODO: put in SgdArgs.
     gamma = 0.9
@@ -114,17 +114,23 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
         -- Sample the dataset
         (batch, stdGen') <- sample stdGen batchSize dataset
 
-        -- Apply regularization to the parameters vector.
-        scale (regularization k) x
+        -- NEW: comment out
+        -- -- Apply regularization to the parameters vector.
+        -- scale (regularization k) x
 
         -- Freeze mutable vector of parameters. The frozen version is
         -- then supplied to external mkGrad function provided by user.
         frozen <- U.unsafeFreeze x
         notify frozen k
 
-        -- Compute the gradient and scale it
+        -- Compute the gradient and put it in `u`
         let grad = parUnions (map (mkGrad frozen) batch)
         addUp grad u
+
+        -- Apply regularization to `u`
+        applyRegularization regularizationParam x u
+
+        -- Scale the gradient
         scale (gain k) u
 
         -- Compute the new momentum
@@ -133,6 +139,19 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
         x' <- U.unsafeThaw frozen
         momentum `addTo` x'
         doIt momentum u (k+1) stdGen' x'
+
+
+-- | Compute the new momentum (gradient) vector.
+applyRegularization
+  :: Double -- ^ Regularization parameter
+  -> MVect  -- ^ The parameters
+  -> MVect  -- ^ The current gradient
+  -> IO ()
+applyRegularization regParam params grad = do
+  forM_ [0 .. UM.length grad - 1] $ \i -> do
+    x <- UM.unsafeRead grad i
+    y <- UM.unsafeRead params i
+    UM.unsafeWrite grad i $ x - regParam * y
 
 
 -- | Compute the new momentum (gradient) vector.
