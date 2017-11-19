@@ -42,11 +42,21 @@ data SgdArgs = SgdArgs
 -- | Default SGD parameter values.
 sgdArgsDefault :: SgdArgs
 sgdArgsDefault = SgdArgs
-    { batchSize = 30
+    { batchSize = 50
     , regVar    = 10
     , iterNum   = 10
-    , gain0     = 1
+    , gain0     = 0.25
+      -- ^ Without momentum I would rather go for '1', but the gradient with
+      -- momentum becomes much larger.
     , tau       = 5 }
+
+
+-- | The gamma parameter which drives momentum.
+--
+-- TODO: put in SgdArgs.
+--
+gamma :: Double
+gamma = 0.9
 
 
 -- | Vector of parameters.
@@ -98,9 +108,6 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
         iVar = 1.0 / regVar
         coef = fromIntegral (size dataset)
              / fromIntegral batchSize
-
-    -- The gamma parameter. TODO: put in SgdArgs.
-    gamma = 0.9
 
     doIt momentum u k stdGen x
 
@@ -160,11 +167,11 @@ updateMomentum
   -> MVect  -- ^ The previous momentum
   -> MVect  -- ^ The scaled current gradient
   -> IO ()
-updateMomentum gamma momentum grad = do
+updateMomentum gammaCoef momentum grad = do
   forM_ [0 .. UM.length momentum - 1] $ \i -> do
     x <- UM.unsafeRead momentum i
     y <- UM.unsafeRead grad i
-    UM.unsafeWrite momentum i (gamma * x + y)
+    UM.unsafeWrite momentum i (gammaCoef * x + y)
 
 
 -- | Add up all gradients and store results in normal domain.
