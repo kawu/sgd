@@ -46,8 +46,8 @@ sgdArgsDefault = SgdArgs
     , regVar    = 10
     , iterNum   = 10
     , gain0     = 0.25
-      -- ^ Without momentum I would rather go for '1', but the gradient with
-      -- momentum becomes much larger.
+      -- Without momentum I would rather go for '1', but with momentum the
+      -- gradient gets significantly larger.
     , tau       = 5 }
 
 

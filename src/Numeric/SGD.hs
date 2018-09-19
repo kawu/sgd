@@ -21,7 +21,7 @@ module Numeric.SGD
 ) where
 
 
-import           Control.Monad (forM_, when)
+import           Control.Monad (forM_)
 import qualified System.Random as R
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector.Unboxed.Mutable as UM
@@ -86,8 +86,8 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
     done k
         = fromIntegral (k * batchSize)
         / fromIntegral (size dataset)
-    doneTotal :: Int -> Int
-    doneTotal = floor . done
+    -- doneTotal :: Int -> Int
+    -- doneTotal = floor . done
 
     -- Regularization (Guassian prior)
     regularization k = regCoef
