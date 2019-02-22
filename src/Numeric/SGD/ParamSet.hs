@@ -10,8 +10,12 @@ module Numeric.SGD.ParamSet
   ) where
 
 
-import           Prelude hiding (div)
 import           GHC.Generics
+import           GHC.TypeNats (KnownNat)
+
+import           Prelude hiding (div)
+
+import qualified Numeric.LinearAlgebra.Static as LA
 
 
 -- | Class of types that can be treated as parameter sets.  It provides basic
@@ -61,6 +65,12 @@ class ParamSet a where
   zero = genericZero
   {-# INLINE zero #-}
 
+  default pmap
+    :: (Generic a, GPMap (Rep a))
+    => (Double -> Double) -> a -> a
+  pmap = genericPMap
+  {-# INLINE pmap #-}
+
   default add :: (Generic a, GAdd (Rep a)) => a -> a -> a
   add = genericAdd
   {-# INLINE add #-}
@@ -83,59 +93,52 @@ class ParamSet a where
 
 
 -- | 'add' using GHC Generics; works if all fields are instances of
--- 'Backprop', but only for values with single constructors.
+-- 'ParamSet', but only for values with single constructors.
 genericZero :: (Generic a, GZero (Rep a)) => a
 genericZero = to gzero
 {-# INLINE genericZero #-}
 
 
 -- | 'add' using GHC Generics; works if all fields are instances of
--- 'Backprop', but only for values with single constructors.
+-- 'ParamSet', but only for values with single constructors.
 genericAdd :: (Generic a, GAdd (Rep a)) => a -> a -> a
 genericAdd x y = to $ gadd (from x) (from y)
 {-# INLINE genericAdd #-}
 
 
 -- | 'sub' using GHC Generics; works if all fields are instances of
--- 'Backprop', but only for values with single constructors.
+-- 'ParamSet', but only for values with single constructors.
 genericSub :: (Generic a, GSub (Rep a)) => a -> a -> a
 genericSub x y = to $ gsub (from x) (from y)
 {-# INLINE genericSub #-}
 
 
 -- | 'div' using GHC Generics; works if all fields are instances of
--- 'Backprop', but only for values with single constructors.
+-- 'ParamSet', but only for values with single constructors.
 genericDiv :: (Generic a, GDiv (Rep a)) => a -> a -> a
 genericDiv x y = to $ gdiv (from x) (from y)
 {-# INLINE genericDiv #-}
 
 
 -- | 'mul' using GHC Generics; works if all fields are instances of
--- 'Backprop', but only for values with single constructors.
+-- 'ParamSet', but only for values with single constructors.
 genericMul :: (Generic a, GMul (Rep a)) => a -> a -> a
 genericMul x y = to $ gmul (from x) (from y)
 {-# INLINE genericMul #-}
 
 
 -- | 'norm_2' using GHC Generics; works if all fields are instances of
--- 'Backprop', but only for values with single constructors.
+-- 'ParamSet', but only for values with single constructors.
 genericNorm2 :: (Generic a, GNorm2 (Rep a)) => a -> Double
 genericNorm2 x = gnorm_2 (from x)
 {-# INLINE genericNorm2 #-}
 
 
--- -- | Root square
--- squareRoot :: p -> p
--- squareRoot = pmap sqrt
--- 
--- -- | Square
--- square :: p -> p
--- square x = x `mul` x
---
--- -- | Scaling
--- scale :: Double -> p -> p
--- scale x = pmap (*x)
-
+-- | 'pmap' using GHC Generics; works if all fields are instances of
+-- 'ParamSet', but only for values with single constructors.
+genericPMap :: (Generic a, GPMap (Rep a)) => (Double -> Double) -> a -> a
+genericPMap f x = to $ gpmap f (from x)
+{-# INLINE genericPMap #-}
 
 
 --------------------------------------------------
@@ -170,9 +173,9 @@ instance GZero f => GZero (M1 i c f) where
     gzero = M1 gzero
     {-# INLINE gzero #-}
 
-instance GZero f => GZero (f :.: g) where
-    gzero = Comp1 gzero
-    {-# INLINE gzero #-}
+-- instance GZero f => GZero (f :.: g) where
+--     gzero = Comp1 gzero
+--     {-# INLINE gzero #-}
 
 
 -- | Helper class for automatically deriving 'add' using GHC Generics.
@@ -202,9 +205,9 @@ instance GAdd f => GAdd (M1 i c f) where
     gadd (M1 x) (M1 y) = M1 (gadd x y)
     {-# INLINE gadd #-}
 
-instance GAdd f => GAdd (f :.: g) where
-    gadd (Comp1 x) (Comp1 y) = Comp1 (gadd x y)
-    {-# INLINE gadd #-}
+-- instance GAdd f => GAdd (f :.: g) where
+--     gadd (Comp1 x) (Comp1 y) = Comp1 (gadd x y)
+--     {-# INLINE gadd #-}
 
 
 -- | Helper class for automatically deriving 'sub' using GHC Generics.
@@ -234,9 +237,9 @@ instance GSub f => GSub (M1 i c f) where
     gsub (M1 x) (M1 y) = M1 (gsub x y)
     {-# INLINE gsub #-}
 
-instance GSub f => GSub (f :.: g) where
-    gsub (Comp1 x) (Comp1 y) = Comp1 (gsub x y)
-    {-# INLINE gsub #-}
+-- instance GSub f => GSub (f :.: g) where
+--     gsub (Comp1 x) (Comp1 y) = Comp1 (gsub x y)
+--     {-# INLINE gsub #-}
 
 
 -- | Helper class for automatically deriving 'mul' using GHC Generics.
@@ -266,9 +269,9 @@ instance GMul f => GMul (M1 i c f) where
     gmul (M1 x) (M1 y) = M1 (gmul x y)
     {-# INLINE gmul #-}
 
-instance GMul f => GMul (f :.: g) where
-    gmul (Comp1 x) (Comp1 y) = Comp1 (gmul x y)
-    {-# INLINE gmul #-}
+-- instance GMul f => GMul (f :.: g) where
+--     gmul (Comp1 x) (Comp1 y) = Comp1 (gmul x y)
+--     {-# INLINE gmul #-}
 
 
 -- | Helper class for automatically deriving 'div' using GHC Generics.
@@ -298,9 +301,9 @@ instance GDiv f => GDiv (M1 i c f) where
     gdiv (M1 x) (M1 y) = M1 (gdiv x y)
     {-# INLINE gdiv #-}
 
-instance GDiv f => GDiv (f :.: g) where
-    gdiv (Comp1 x) (Comp1 y) = Comp1 (gdiv x y)
-    {-# INLINE gdiv #-}
+-- instance GDiv f => GDiv (f :.: g) where
+--     gdiv (Comp1 x) (Comp1 y) = Comp1 (gdiv x y)
+--     {-# INLINE gdiv #-}
 
 
 -- | Helper class for automatically deriving 'norm_2' using GHC Generics.
@@ -331,7 +334,64 @@ instance GNorm2 f => GNorm2 (M1 i c f) where
     gnorm_2 (M1 x) = gnorm_2 x
     {-# INLINE gnorm_2 #-}
 
--- TODO: Make sure this makes sense
-instance GNorm2 f => GNorm2 (f :.: g) where
-    gnorm_2 (Comp1 x) = gnorm_2 x
-    {-# INLINE gnorm_2 #-}
+-- -- TODO: Make sure this makes sense
+-- instance GNorm2 f => GNorm2 (f :.: g) where
+--     gnorm_2 (Comp1 x) = gnorm_2 x
+--     {-# INLINE gnorm_2 #-}
+
+
+-- | Helper class for automatically deriving 'pmap' using GHC Generics.
+class GPMap f where
+    gpmap :: (Double -> Double) -> f t -> f t
+
+instance ParamSet a => GPMap (K1 i a) where
+    gpmap f (K1 x) = K1 (pmap f x)
+    {-# INLINE gpmap #-}
+
+instance (GPMap f, GPMap g) => GPMap (f :*: g) where
+    gpmap f (x1 :*: y1) = x2 :*: y2
+      where
+        !x2 = gpmap f x1
+        !y2 = gpmap f y1
+    {-# INLINE gpmap #-}
+
+instance GPMap V1 where
+    gpmap _ = \case {}
+    {-# INLINE gpmap #-}
+
+instance GPMap U1 where
+    gpmap _ _ = U1
+    {-# INLINE gpmap #-}
+
+instance GPMap f => GPMap (M1 i c f) where
+    gpmap f (M1 x) = M1 (gpmap f x)
+    {-# INLINE gpmap #-}
+
+-- instance GPMap f => GPMap (f :.: g) where
+--     gpmap f (Comp1 x) = Comp1 (gpmap f x)
+--     {-# INLINE gpmap #-}
+
+
+--------------------------------------------------
+-- Instances
+--------------------------------------------------
+
+
+instance (KnownNat n) => ParamSet (LA.R n) where
+  zero = 0
+  pmap = LA.dvmap
+  add = (+)
+  sub = (-)
+  mul = (*)
+  div = (/)
+  norm_2 = LA.norm_2
+
+
+instance (KnownNat n, KnownNat m) => ParamSet (LA.L n m) where
+  zero = 0
+  pmap = LA.dmmap
+  add = (+)
+  sub = (-)
+  mul = (*)
+  div = (/)
+  norm_2 = LA.norm_2
