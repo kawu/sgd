@@ -1,23 +1,24 @@
 {-# LANGUAGE RecordWildCards #-}
 
 
--- | Stochastic gradient descent implementation using mutable
--- vectors for efficient update of the parameters vector.
--- A user is provided with the immutable vector of parameters
--- so he is able to compute the gradient outside of the IO monad.
--- Currently only the Gaussian priors are implemented.
+-- | Stochastic gradient descent using mutable vectors for efficient parameter
+-- update.  This module is intended for use with sparse features.  If you use
+-- dense feature vectors (as arise e.g. in deep learning), have a look at
+-- `Numeric.SGD`.
+-- 
+-- Currently only the Gaussian regularization is implemented.
 --
--- This is a preliminary version of the SGD library and API may change
--- in future versions.
+-- SGD with momentum is known to converge faster than vanilla SGD.  It's
+-- implementation can be found in `Numeric.SGD.Sparse.Momentum`.
 
 
-module Numeric.SGD
+module Numeric.SGD.Sparse
 ( SgdArgs (..)
 , sgdArgsDefault
 , Para
 , sgd
-, module Numeric.SGD.Grad
-, module Numeric.SGD.Dataset
+, module Numeric.SGD.Sparse.Grad
+, module Numeric.SGD.Sparse.Dataset
 ) where
 
 
@@ -27,8 +28,8 @@ import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector.Unboxed.Mutable as UM
 import qualified Control.Monad.Primitive as Prim
 
-import           Numeric.SGD.Grad
-import           Numeric.SGD.Dataset
+import           Numeric.SGD.Sparse.Grad
+import           Numeric.SGD.Sparse.Dataset
 
 
 -- | SGD parameters controlling the learning process.

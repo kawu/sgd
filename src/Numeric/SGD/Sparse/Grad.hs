@@ -1,18 +1,16 @@
 {-# LANGUAGE CPP #-}
 
--- | A gradient is represented by an IntMap from gradient indices
--- to values. Elements with no associated values in the gradient
--- are assumed to have a 0 value assigned. Such elements are
--- not interesting: when adding the gradient to the vector of
--- parameters, only nonzero elements are taken into account.
+-- | A gradient is represented by an IntMap from gradient indices to values.
+-- Elements with no associated values in the gradient are assumed to have a 0
+-- value assigned.  Such elements are of no interest: when adding the gradient
+-- to the vector of parameters, only non-zero elements are taken into account.
 -- 
--- Each value associated with a gradient position is a pair of
--- positive and negative components. They are stored separately
--- to ensure high accuracy of computation results.
--- Besides, both positive and negative components are stored
--- in a logarithmic domain.
+-- Each value associated with a gradient position is a pair of positive and
+-- negative components.  They are stored separately to ensure high accuracy of
+-- computation results.  Besides, both positive and negative components are
+-- stored in a logarithmic domain.
 
-module Numeric.SGD.Grad
+module Numeric.SGD.Sparse.Grad
 ( Grad
 , empty
 , add
@@ -38,7 +36,7 @@ import qualified Data.IntMap.Strict as M
 import qualified Data.IntMap as M
 #endif
 
-import Numeric.SGD.LogSigned
+import Numeric.SGD.Sparse.LogSigned
 
 -- | Gradient with nonzero values stored in a logarithmic domain.
 -- Since values equal to zero have no impact on the update phase

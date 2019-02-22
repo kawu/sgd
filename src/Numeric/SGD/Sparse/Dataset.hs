@@ -4,7 +4,7 @@
 -- | Dataset abstraction.
 
 
-module Numeric.SGD.Dataset
+module Numeric.SGD.Sparse.Dataset
 ( 
 -- * Dataset
   Dataset (..)
@@ -23,10 +23,10 @@ import           Data.Binary (Binary, encodeFile, decode)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import           System.IO.Temp (withTempDirectory)
+import           System.IO.Unsafe (unsafeInterleaveIO)
 import           System.FilePath ((</>))
 import qualified System.Random as R
 import qualified Data.Vector as V
-import qualified Control.Monad.LazyIO as LazyIO
 import qualified Control.Monad.State.Strict as S
 
 
@@ -36,7 +36,8 @@ data Dataset a = Dataset {
       size      :: Int
     -- | Get dataset element with a given index.  The set of indices
     -- is of a {0, 1, .., size - 1} form.
-    , elemAt    :: Int -> IO a }
+    , elemAt    :: Int -> IO a 
+    }
 
 
 -------------------------------------------
@@ -46,7 +47,7 @@ data Dataset a = Dataset {
 
 -- | Lazily load dataset from a disk.
 loadData :: Dataset a -> IO [a]
-loadData Dataset{..} = LazyIO.mapM elemAt [0 .. size - 1]
+loadData Dataset{..} = lazyMapM elemAt [0 .. size - 1]
 
 
 -- | A dataset sample of the given size.
@@ -101,3 +102,23 @@ withData :: Binary a => Bool -> [a] -> (Dataset a -> IO b) -> IO b
 withData x = case x of
     True    -> withDisk
     False   -> withVect
+
+
+-------------------------------------------
+-- Lazy IO Utils
+-------------------------------------------
+
+
+-- | Lazily evaluate each action in the sequence from left to right,
+-- and collect the results.
+lazySequence :: [IO a] -> IO [a]
+lazySequence (mx:mxs) = do
+    x   <- mx
+    xs  <- unsafeInterleaveIO (lazySequence mxs)
+    return (x : xs)
+lazySequence [] = return []
+
+
+-- | `lazyMapM` f is equivalent to `lazySequence` . `map` f.
+lazyMapM :: (a -> IO b) -> [a] -> IO [b]
+lazyMapM f = lazySequence . map f

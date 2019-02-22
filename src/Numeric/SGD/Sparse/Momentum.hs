@@ -1,27 +1,27 @@
 {-# LANGUAGE RecordWildCards #-}
 
 
--- | A version of `Numeric.SGD` extended with momentum.
+-- | A version of `Numeric.SGD.Sparse` extended with momentum.
 
 
-module Numeric.SGD.Momentum
+module Numeric.SGD.Sparse.Momentum
 ( SgdArgs (..)
 , sgdArgsDefault
 , Para
 , sgd
-, module Numeric.SGD.Grad
-, module Numeric.SGD.Dataset
+, module Numeric.SGD.Sparse.Grad
+, module Numeric.SGD.Sparse.Dataset
 ) where
 
 
-import           Control.Monad (forM_, when)
+import           Control.Monad (forM_)
 import qualified System.Random as R
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector.Unboxed.Mutable as UM
 import qualified Control.Monad.Primitive as Prim
 
-import           Numeric.SGD.Grad
-import           Numeric.SGD.Dataset
+import           Numeric.SGD.Sparse.Grad
+import           Numeric.SGD.Sparse.Dataset
 
 
 -- | SGD parameters controlling the learning process.
@@ -36,7 +36,8 @@ data SgdArgs = SgdArgs
     , gain0     :: Double
     -- | After how many iterations over the entire dataset
     -- the gain parameter is halved
-    , tau       :: Double }
+    , tau       :: Double 
+    }
 
 
 -- | Default SGD parameter values.
@@ -48,7 +49,8 @@ sgdArgsDefault = SgdArgs
     , gain0     = 0.25
       -- Without momentum I would rather go for '1', but with momentum the
       -- gradient gets significantly larger.
-    , tau       = 5 }
+    , tau       = 5 
+    }
 
 
 -- | The gamma parameter which drives momentum.
@@ -98,8 +100,6 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
     done k
         = fromIntegral (k * batchSize)
         / fromIntegral (size dataset)
-    doneTotal :: Int -> Int
-    doneTotal = floor . done
 
     -- Regularization (Guassian prior) parameter
     regularizationParam = regCoef

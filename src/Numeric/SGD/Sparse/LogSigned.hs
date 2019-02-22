@@ -3,7 +3,7 @@
 
 -- | Module provides data type for signed log-domain calculations.
 
-module Numeric.SGD.LogSigned
+module Numeric.SGD.Sparse.LogSigned
 ( LogSigned (..)
 , logSigned
 , fromPos
