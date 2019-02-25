@@ -10,18 +10,18 @@ module Numeric.SGD.Sparse.Momentum
 , Para
 , sgd
 , module Numeric.SGD.Sparse.Grad
-, module Numeric.SGD.Sparse.Dataset
+, module Numeric.SGD.DataSet
 ) where
 
 
 import           Control.Monad (forM_)
-import qualified System.Random as R
+-- import qualified System.Random as R
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector.Unboxed.Mutable as UM
 import qualified Control.Monad.Primitive as Prim
 
 import           Numeric.SGD.Sparse.Grad
-import           Numeric.SGD.Sparse.Dataset
+import           Numeric.SGD.DataSet
 
 
 -- | SGD parameters controlling the learning process.
@@ -76,7 +76,7 @@ sgd
     :: SgdArgs                  -- ^ SGD parameter values
     -> (Para -> Int -> IO ())   -- ^ Notification run every update
     -> (Para -> x -> Grad)      -- ^ Gradient for dataset element
-    -> Dataset x                -- ^ Dataset
+    -> DataSet x                -- ^ DataSet
     -> Para                     -- ^ Starting point
     -> IO Para                  -- ^ SGD result
 sgd SgdArgs{..} notify mkGrad dataset x0 = do
@@ -89,7 +89,7 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
   -- A worker vector for computing the actual gradients
   u <- UM.new (U.length x0)
 
-  doIt momentum u 0 (R.mkStdGen 0) =<< U.thaw x0
+  doIt momentum u 0 =<< U.thaw x0
 
   where
     -- Gain in k-th iteration.
@@ -109,7 +109,7 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
         coef = fromIntegral (size dataset)
              / fromIntegral batchSize
 
-    doIt momentum u k stdGen x
+    doIt momentum u k x
 
       | done k > iterNum = do
         frozen <- U.unsafeFreeze x
@@ -119,7 +119,7 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
       | otherwise = do
 
         -- Sample the dataset
-        (batch, stdGen') <- sample stdGen batchSize dataset
+        batch <- randomSample batchSize dataset
 
         -- NEW: comment out
         -- -- Apply regularization to the parameters vector.
@@ -145,7 +145,7 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
 
         x' <- U.unsafeThaw frozen
         momentum `addTo` x'
-        doIt momentum u (k+1) stdGen' x'
+        doIt momentum u (k+1) x'
 
 
 -- | Compute the new momentum (gradient) vector.

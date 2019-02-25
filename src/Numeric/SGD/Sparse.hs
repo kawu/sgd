@@ -18,18 +18,18 @@ module Numeric.SGD.Sparse
 , Para
 , sgd
 , module Numeric.SGD.Sparse.Grad
-, module Numeric.SGD.Sparse.Dataset
+, module Numeric.SGD.DataSet
 ) where
 
 
 import           Control.Monad (forM_)
-import qualified System.Random as R
+-- import qualified System.Random as R
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector.Unboxed.Mutable as UM
 import qualified Control.Monad.Primitive as Prim
 
 import           Numeric.SGD.Sparse.Grad
-import           Numeric.SGD.Sparse.Dataset
+import           Numeric.SGD.DataSet
 
 
 -- | SGD parameters controlling the learning process.
@@ -72,12 +72,13 @@ sgd
     :: SgdArgs                  -- ^ SGD parameter values
     -> (Para -> Int -> IO ())   -- ^ Notification run every update
     -> (Para -> x -> Grad)      -- ^ Gradient for dataset element
-    -> Dataset x                -- ^ Dataset
+    -> DataSet x                -- ^ Dataset
     -> Para                     -- ^ Starting point
     -> IO Para                  -- ^ SGD result
 sgd SgdArgs{..} notify mkGrad dataset x0 = do
   u <- UM.new (U.length x0)
-  doIt u 0 (R.mkStdGen 0) =<< U.thaw x0
+  -- doIt u 0 (R.mkStdGen 0) =<< U.thaw x0
+  doIt u 0 =<< U.thaw x0
   where
     -- Gain in k-th iteration.
     gain k = (gain0 * tau) / (tau + done k)
@@ -101,13 +102,14 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
 --     -- Regularization (Guassian prior) after a full dataset pass
 --     regularization k = 1.0 - (gain k / regVar)
 
-    doIt u k stdGen x
+    doIt u k x
       | done k > iterNum = do
         frozen <- U.unsafeFreeze x
         notify frozen k
         return frozen
       | otherwise = do
-        (batch, stdGen') <- sample stdGen batchSize dataset
+        -- (batch, stdGen') <- sample stdGen batchSize dataset
+        batch <- randomSample batchSize dataset
 
         -- Regularization
         -- when (doneTotal (k - 1) /= doneTotal k) $ do
@@ -135,7 +137,7 @@ sgd SgdArgs{..} notify mkGrad dataset x0 = do
 
         x' <- U.unsafeThaw frozen
         u `addTo` x'
-        doIt u (k+1) stdGen' x'
+        doIt u (k+1) x'
 
 
 -- | Add up all gradients and store results in normal domain.

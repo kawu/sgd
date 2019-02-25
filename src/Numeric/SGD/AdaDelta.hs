@@ -3,7 +3,6 @@
 
 module Numeric.SGD.AdaDelta
   ( Config(..)
-  , Dyna(..)
   , adaDelta
   ) where
 
@@ -16,52 +15,28 @@ import           Numeric.SGD.ParamSet
 
 -- | AdaDelta configuration
 data Config = Config
-  { decay :: Double
+  { iterNum :: Int
+    -- ^ Number of iteration to perform
+  , reportEvery :: Int
+    -- ^ How often (in terms of the numer of iterations) to report the quality
+  , decay :: Double
     -- ^ Exponential decay parameter
   , eps   :: Double
     -- ^ Epsilon value
   }
 
 
--- | AdaDelta ,,dynamic'' configuration
-data Dyna p = Dyna
-  { gradient :: p -> IO p
-    -- ^ Gradient on (a part of) the training data w.r.t. the given parameter
-    -- set.  Embedded in the IO monad because of the stochasticity of the
-    -- process.
-  , quality :: p -> IO Double
-    -- ^ Quality measure.  Embedded in the IO monad for convenience.  You
-    -- may, for instance, pick a random subset of the training dataset to
-    -- calculate the quality.
-  , iterNum :: Int
-    -- ^ Number of iteration to perform
-  , reportEvery :: Int
-    -- ^ How often (in terms of the numer of iterations) to report the quality
-  }
-
-
--- class ParamSet p where
---   -- | Zero
---   zero :: p
---   -- | Mapping
---   pmap :: (Double -> Double) -> p -> p
--- 
---   -- | Negation
---   neg :: p -> p
---   neg = pmap (\x -> -x)
---   -- | Addition
---   add :: p -> p -> p
---   add x y = x `sub` neg y
---   -- | Substruction
---   sub :: p -> p -> p
---   sub x y = x `add` neg y
--- 
---   -- | Element-wise multiplication
---   mul :: p -> p -> p
---   mul x y = x `div` pmap (1.0/) y
---   -- | Element-wise division
---   div :: p -> p -> p
---   div x y = x `mul` pmap (1.0/) y
+-- -- | AdaDelta ,,dynamic'' configuration
+-- data Dyna p = Dyna
+--   { gradient :: p -> IO p
+--     -- ^ Gradient on (a part of) the training data w.r.t. the given parameter
+--     -- set.  Embedded in the IO monad because of the stochasticity of the
+--     -- process.
+--   , quality :: p -> IO Double
+--     -- ^ Quality measure.  Embedded in the IO monad for convenience.  You
+--     -- may, for instance, pick a random subset of the training dataset to
+--     -- calculate the quality.
+--   }
 
 
 -- | Perform gradient descent using the AdaDelta algorithm.
@@ -69,12 +44,18 @@ adaDelta
   :: (ParamSet p)
   => Config
     -- ^ AdaDelta configuration
-  -> Dyna p
-    -- ^ AdaDelta ,,dynamic'' configuration
+  -> (p -> IO p)
+    -- ^ Gradient on (some part of) the training data w.r.t. the given
+    -- parameter set.  Embedded in the IO monad because of the stochasticity of
+    -- the process.
+  -> (p -> IO Double)
+    -- ^ Quality measure.  Embedded in the IO monad for convenience.  You
+    -- may, for instance, pick a random subset of the training dataset to
+    -- calculate the quality.
   -> p 
     -- ^ Initial parameters
   -> IO p
-adaDelta Config{..} Dyna{..} net0 =
+adaDelta Config{..} gradient quality net0 =
 
   go 0 zero zero zero net0
 
