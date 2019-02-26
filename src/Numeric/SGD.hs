@@ -11,6 +11,7 @@ module Numeric.SGD
 
 
 import           GHC.Generics (Generic)
+import           Numeric.Natural (Natural)
 
 import           Prelude hiding (elem)
 import           Control.Monad (forM_)
@@ -29,10 +30,12 @@ import           Numeric.SGD.DataSet
 
 -- | Top-level SGD static configuration
 data Config = Config
-  { iterNum :: Integer
+  { iterNum :: Natural
     -- ^ Number of iteration over the entire training dataset
-  , batchSize :: Integer
+  , batchSize :: Natural
     -- ^ Size of the SGD batch
+  , batchRandom :: Bool
+    -- ^ Should the batch be selected at random?
   , method :: Method
     -- ^ Selected SGD method
   , reportEvery :: Double
@@ -84,7 +87,13 @@ sgd
   -> p
     -- ^ Initial parameter values
   -> IO p
-sgd Config{..} dataSet grad0 quality0 net0 =
+sgd Config{..} dataSet grad0 quality0 net0 = do
+  grad <-
+    if batchRandom
+       then pure randomGrad
+       else do
+         ixRef <- IO.newIORef 0 
+         pure (determGrad ixRef)
   case method of
     AdaDelta{..} ->
       let cfg = Ada.Config
@@ -101,14 +110,28 @@ sgd Config{..} dataSet grad0 quality0 net0 =
        in Ada.adaDelta cfg grad quality net0
     Momentum -> error "sgd: momentum not implemented yet!"
   where
-    grad net = do
+    randomGrad net = do
       sample <- randomSample (fromIntegral batchSize) dataSet
       return $ grad0 sample net
+    determGrad ixRef net = do
+      p <- IO.readIORef ixRef
+      let q = p + fromIntegral batchSize - 1
+      sample <- range p q dataSet
+      IO.writeIORef ixRef $
+        if p + 1 >= size dataSet then 0 else p + 1
+      return $ grad0 sample net
     quality net = do
-      -- TODO: we could repot on a random sample!
-      -- That could be also done more often!
       res <- IO.newIORef 0.0
       forM_ [0 .. size dataSet - 1] $ \ix -> do
         elem <- elemAt dataSet ix
         IO.modifyIORef' res (+ quality0 elem net)
       IO.readIORef res
+
+
+-- | Dataset sample over a given (inclusive) range
+range :: Int -> Int -> DataSet a -> IO [a]
+range p q dataSet
+  | p > q = return []
+  | otherwise = do
+      x <- elemAt dataSet p
+      (x:) <$> range (p+1) q dataSet
