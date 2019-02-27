@@ -378,6 +378,38 @@ instance GPMap f => GPMap (M1 i c f) where
 --------------------------------------------------
 
 
+-- -- | As in the backprop library, `Nothing` is treated the same as `Just 0`.
+-- -- Special case: `div` gives `Nothing` if both arguments are `Nothing`.
+--
+-- TODO: This instance does not work correctly for the moment.  Not sure why.
+--
+-- instance (ParamSet a) => ParamSet (Maybe a) where
+--   zero = Nothing
+--   pmap = fmap . pmap
+-- 
+--   add Nothing Nothing = Nothing
+--   add (Just x) Nothing = Just x
+--   add Nothing (Just y) = Just y
+--   add (Just x) (Just y) = Just (add x y)
+-- 
+--   sub Nothing Nothing = Nothing
+--   sub (Just x) Nothing = Just x
+--   sub Nothing (Just y) = Just (pmap negate y)
+--   sub (Just x) (Just y) = Just (sub x y)
+-- 
+--   mul Nothing Nothing = Nothing
+--   mul (Just _) Nothing = Nothing
+--   mul Nothing (Just _) = Nothing
+--   mul (Just x) (Just y) = Just (mul x y)
+-- 
+--   div Nothing Nothing = Nothing
+--   div (Just _) Nothing = error "ParamSet.div: division by Nothing"
+--   div Nothing (Just _) = Nothing
+--   div (Just x) (Just y) = Just (div x y)
+-- 
+--   norm_2 = maybe 0 norm_2
+
+
 instance (KnownNat n) => ParamSet (LA.R n) where
   zero = 0
   pmap = LA.dvmap
