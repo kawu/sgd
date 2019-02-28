@@ -4,10 +4,14 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 
 module Numeric.SGD.ParamSet
   ( ParamSet(..)
+--   -- * Parameter map 
+--   , ParamMap (..)
+--   , lookup
   ) where
 
 
@@ -15,6 +19,8 @@ import           GHC.Generics
 import           GHC.TypeNats (KnownNat)
 
 import           Prelude hiding (div)
+
+-- import qualified Data.Map.Strict as M
 
 import qualified Numeric.LinearAlgebra.Static as LA
 
@@ -33,17 +39,19 @@ import qualified Numeric.LinearAlgebra.Static as LA
 -- `norm_2`.  This function is not stricktly necessary to perform SGD, but can
 -- be useful to control the training behavior.
 --
--- Minimal complete definition: `zero`, `pmap`, (`add` or `sub`), (`mul` or
--- `div`), and `norm_2`.
+-- Minimal complete definition: ``pmap`, (`add` or `sub`), (`mul` or `div`),
+-- and `norm_2`.
 --
 -- If you leave the body of an instance declaration blank, GHC Generics will be
 -- used to derive instances if the type has a single constructor and each field
 -- is an instance of `ParamSet`.
 class ParamSet a where
-  -- | Element-wise zero (the additive identity)
-  zero :: a
   -- | Element-wise mapping
   pmap :: (Double -> Double) -> a -> a
+
+  -- | Zero-out all elements
+  zero :: a -> a
+  zero = pmap (const 0.0)
 
 --   -- | Element-wise negation
 --   neg :: a -> a
@@ -62,9 +70,9 @@ class ParamSet a where
   -- | L2 norm
   norm_2 :: a -> Double
 
-  default zero :: (Generic a, GZero (Rep a)) => a
-  zero = genericZero
-  {-# INLINE zero #-}
+--   default zero :: (Generic a, GZero (Rep a)) => a -> a
+--   zero = genericZero
+--   {-# INLINE zero #-}
 
   default pmap
     :: (Generic a, GPMap (Rep a))
@@ -93,11 +101,11 @@ class ParamSet a where
   {-# INLINE norm_2 #-}
 
 
--- | 'add' using GHC Generics; works if all fields are instances of
--- 'ParamSet', but only for values with single constructors.
-genericZero :: (Generic a, GZero (Rep a)) => a
-genericZero = to gzero
-{-# INLINE genericZero #-}
+-- -- | 'add' using GHC Generics; works if all fields are instances of
+-- -- 'ParamSet', but only for values with single constructors.
+-- genericZero :: (Generic a, GZero (Rep a)) => a -> a
+-- genericZero x = to $ gzero (from x)
+-- {-# INLINE genericZero #-}
 
 
 -- | 'add' using GHC Generics; works if all fields are instances of
@@ -149,34 +157,36 @@ genericPMap f x = to $ gpmap f (from x)
 --------------------------------------------------
 
 
--- | Helper class for automatically deriving 'add' using GHC Generics.
-class GZero f where
-    gzero :: f t
-
-instance ParamSet p => GZero (K1 i p) where
-    gzero = K1 zero
-    {-# INLINE gzero #-}
-
-instance (GZero f, GZero g) => GZero (f :*: g) where
-    gzero = gzero :*: gzero
-    {-# INLINE gzero #-}
-
--- TODO: not sure if this is the correct way
-instance GZero V1 where
-    gzero = undefined
-    {-# INLINE gzero #-}
-
-instance GZero U1 where
-    gzero = U1
-    {-# INLINE gzero #-}
-
-instance GZero f => GZero (M1 i c f) where
-    gzero = M1 gzero
-    {-# INLINE gzero #-}
-
--- instance GZero f => GZero (f :.: g) where
---     gzero = Comp1 gzero
+-- -- | Helper class for automatically deriving 'add' using GHC Generics.
+-- class GZero f where
+--     gzero :: f t -> f t
+-- 
+-- instance ParamSet p => GZero (K1 i p) where
+--     gzero (K1 x) = K1 (zero x)
 --     {-# INLINE gzero #-}
+-- 
+-- instance (GZero f, GZero g) => GZero (f :*: g) where
+--     gzero (x1 :*: y1) = x2 :*: y2
+--       where
+--         !x2 = gzero x1
+--         !y2 = gzero y1
+--     {-# INLINE gzero #-}
+-- 
+-- instance GZero V1 where
+--     gzero = \case {}
+--     {-# INLINE gzero #-}
+-- 
+-- instance GZero U1 where
+--     gzero _ = U1
+--     {-# INLINE gzero #-}
+-- 
+-- instance GZero f => GZero (M1 i c f) where
+--     gzero (M1 x) = M1 (gzero x)
+--     {-# INLINE gzero #-}
+-- 
+-- -- instance GZero f => GZero (f :.: g) where
+-- --     gzero = Comp1 gzero
+-- --     {-# INLINE gzero #-}
 
 
 -- | Helper class for automatically deriving 'add' using GHC Generics.
@@ -374,44 +384,41 @@ instance GPMap f => GPMap (M1 i c f) where
 
 
 --------------------------------------------------
--- Instances
+-- Basic instances
 --------------------------------------------------
 
 
--- -- | As in the backprop library, `Nothing` is treated the same as `Just 0`.
--- -- Special case: `div` gives `Nothing` if both arguments are `Nothing`.
---
--- TODO: This instance does not work correctly for the moment.  Not sure why.
---
--- instance (ParamSet a) => ParamSet (Maybe a) where
---   zero = Nothing
---   pmap = fmap . pmap
--- 
---   add Nothing Nothing = Nothing
---   add (Just x) Nothing = Just x
---   add Nothing (Just y) = Just y
---   add (Just x) (Just y) = Just (add x y)
--- 
---   sub Nothing Nothing = Nothing
---   sub (Just x) Nothing = Just x
---   sub Nothing (Just y) = Just (pmap negate y)
---   sub (Just x) (Just y) = Just (sub x y)
--- 
---   mul Nothing Nothing = Nothing
---   mul (Just _) Nothing = Nothing
---   mul Nothing (Just _) = Nothing
---   mul (Just x) (Just y) = Just (mul x y)
--- 
---   div Nothing Nothing = Nothing
---   div (Just _) Nothing = error "ParamSet.div: division by Nothing"
---   div Nothing (Just _) = Nothing
---   div (Just x) (Just y) = Just (div x y)
--- 
---   norm_2 = maybe 0 norm_2
+-- | As in the backprop library, `Nothing` is treated the same as `Just 0`.
+-- Special case: `div` gives `Nothing` if both arguments are `Nothing`.
+instance (ParamSet a) => ParamSet (Maybe a) where
+  zero = fmap zero
+  pmap = fmap . pmap
+
+  add Nothing Nothing = Nothing
+  add (Just x) Nothing = Just x
+  add Nothing (Just y) = Just y
+  add (Just x) (Just y) = Just (add x y)
+
+  sub Nothing Nothing = Nothing
+  sub (Just x) Nothing = Just x
+  sub Nothing (Just y) = Just (pmap negate y)
+  sub (Just x) (Just y) = Just (sub x y)
+
+  mul Nothing Nothing = Nothing
+  mul (Just _) Nothing = Nothing
+  mul Nothing (Just _) = Nothing
+  mul (Just x) (Just y) = Just (mul x y)
+
+  div Nothing Nothing = Nothing
+  div (Just _) Nothing = error "ParamSet.div: division by Nothing"
+  div Nothing (Just _) = Nothing
+  div (Just x) (Just y) = Just (div x y)
+
+  norm_2 = maybe 0 norm_2
 
 
 instance (KnownNat n) => ParamSet (LA.R n) where
-  zero = 0
+  zero = const 0
   pmap = LA.dvmap
   add = (+)
   sub = (-)
@@ -421,10 +428,50 @@ instance (KnownNat n) => ParamSet (LA.R n) where
 
 
 instance (KnownNat n, KnownNat m) => ParamSet (LA.L n m) where
-  zero = 0
+  zero = const 0
   pmap = LA.dmmap
   add = (+)
   sub = (-)
   mul = (*)
   div = (/)
   norm_2 = LA.norm_2
+
+
+--------------------------------------------------
+-- Parameter map
+--------------------------------------------------
+
+
+-- -- | Parameter map.  Each key not in the map is treated as `0` (modulo
+-- -- `postFun`).
+-- data ParamMap k a = ParamMap
+--   { unParamMap :: M.Map k a
+--     -- ^ The map itself
+--   , postFun :: Double -> Double
+--     -- ^ Post-processing function to be applied (with `pmap`) to each value in
+--     -- the map.  Needed to correctl implement `pmap`.
+--   } deriving (Generic)
+-- 
+-- 
+-- -- | Lookup the value by key in the map.
+-- lookup :: (Ord k, ParamSet a) => k -> ParamMap k a -> Maybe a
+-- lookup k m = pmap (postFun m) <$> M.lookup k (unParamMap m)
+-- 
+-- 
+-- instance (ParamSet a) => ParamSet (ParamMap k a) where
+--   zero = ParamMap M.empty id
+--   pmap f m = m {postFun = f . postFun m}
+-- 
+--   add = M.unionWith SGD.add
+-- --   sub x y = M.unions
+-- --     [ x `M.difference` y
+-- --     , M.unionWith SGD.add x y
+-- --     , SGD.pmap negate (y `M.difference` x)
+-- --     ]
+-- --   mul = M.intersectionWith SGD.mul
+-- 
+--   add = undefined
+--   sub = undefined
+--   mul = undefined
+--   div = undefined
+--   norm_2 = undefined

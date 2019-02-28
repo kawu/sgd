@@ -57,7 +57,8 @@ adaDelta
   -> IO p
 adaDelta Config{..} gradient quality net0 =
 
-  go 0 zero zero zero net0
+  let zr = zero net0 
+   in go 0 zr zr zr net0
 
   where
 
