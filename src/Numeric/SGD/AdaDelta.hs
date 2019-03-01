@@ -1,61 +1,47 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveGeneric #-}
+
+-- | Implementation of the AdaDelta algorithm as described in the following
+-- paper:
+--
+--     * https://arxiv.org/pdf/1212.5701.pdf
 
 
 module Numeric.SGD.AdaDelta
   ( Config(..)
-  , adaDelta
+  , adaDeltaM
   ) where
 
+
+import           GHC.Generics (Generic)
 
 import           Prelude hiding (div)
 import           Control.Monad (when)
 
 import           Numeric.SGD.ParamSet
+import           Numeric.SGD.Args
 
 
 -- | AdaDelta configuration
 data Config = Config
-  { iterNum :: Int
-    -- ^ Number of iteration to perform
-  , reportEvery :: Int
-    -- ^ How often (in terms of the numer of iterations) to report the quality
-  , decay :: Double
+  { decay :: Double
     -- ^ Exponential decay parameter
   , eps   :: Double
     -- ^ Epsilon value
-  }
-
-
--- -- | AdaDelta ,,dynamic'' configuration
--- data Dyna p = Dyna
---   { gradient :: p -> IO p
---     -- ^ Gradient on (a part of) the training data w.r.t. the given parameter
---     -- set.  Embedded in the IO monad because of the stochasticity of the
---     -- process.
---   , quality :: p -> IO Double
---     -- ^ Quality measure.  Embedded in the IO monad for convenience.  You
---     -- may, for instance, pick a random subset of the training dataset to
---     -- calculate the quality.
---   }
+  } deriving (Show, Eq, Ord, Generic)
 
 
 -- | Perform gradient descent using the AdaDelta algorithm.
-adaDelta
-  :: (ParamSet p)
+adaDeltaM
+  :: (Monad m, ParamSet p)
   => Config
     -- ^ AdaDelta configuration
-  -> (p -> IO p)
-    -- ^ Gradient on (some part of) the training data w.r.t. the given
-    -- parameter set.  Embedded in the IO monad because of the stochasticity of
-    -- the process.
-  -> (p -> IO Double)
-    -- ^ Quality measure.  Embedded in the IO monad for convenience.  You
-    -- may, for instance, pick a random subset of the training dataset to
-    -- calculate the quality.
+  -> Args m p
+    -- ^ General SGD arguments
   -> p 
     -- ^ Initial parameters
-  -> IO p
-adaDelta Config{..} gradient quality net0 =
+  -> m p
+adaDeltaM Config{..} Args{..} net0 =
 
   let zr = zero net0 
    in go 0 zr zr zr net0
@@ -65,10 +51,9 @@ adaDelta Config{..} gradient quality net0 =
     go k expSqGradPrev expSqDeltaPrev deltaPrev net
       | k > iterNum = return net
       | otherwise = do
-          let netSize = norm_2 net
-          when (k `mod` reportEvery == 0) $ do
-            putStr . show =<< quality net
-            putStrLn $ " (norm_2 = " ++ show netSize ++ ")"
+          -- let netSize = norm_2 net
+          when (k `mod` reportPeriod == 0) $ do
+            report net
           -- grad <- netSize `seq` gradient net
           grad <- gradient net
           let expSqGrad = scale decay expSqGradPrev

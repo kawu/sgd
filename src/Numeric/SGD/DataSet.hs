@@ -11,7 +11,6 @@ module Numeric.SGD.DataSet
 -- * Reading
 , loadData
 , randomSample
--- , sample
 -- * Construction
 , withVect
 , withDisk
@@ -66,7 +65,7 @@ loadData DataSet{..} = lazyMapM elemAt [0 .. size - 1]
 --     return (x:xs, g'')
 
 
--- | Random dataset sample of a specified size
+-- | Random dataset sample with a specified number of elements (loaded eagerly)
 randomSample :: Int -> DataSet a -> IO [a]
 randomSample k dataSet
   | k <= 0 = return []
@@ -93,8 +92,9 @@ withVect xs handler =
         , elemAt    = \k -> return (v V.! k) }
 
 
--- | Construct dataset from a list of elements, store it on a disk
--- and run the given handler.
+-- | Construct dataset from a list of elements, store it on a disk and run the
+-- given handler.  Training elements must have the `Binary` instance for this
+-- function to work.
 withDisk :: Binary a => [a] -> (DataSet a -> IO b) -> IO b
 withDisk xs handler = withTempDirectory "." ".sgd" $ \tmpDir -> do
     -- We use state monad to compute the number of dataset elements. 
@@ -102,22 +102,13 @@ withDisk xs handler = withTempDirectory "." ".sgd" $ \tmpDir -> do
         S.lift $ encodeFile (tmpDir </> show ix) x
         S.modify (+1)
 
-    -- We need to avoid decodeFile laziness when using some older
-    -- versions of the binary library.
+    -- Avoid decodeFile laziness when using some older versions of the binary
+    -- library (as of year 2019, this could be probably simplified)
     let at ix = do
         cs <- B.readFile (tmpDir </> show ix)
         return . decode $ BL.fromChunks [cs]
 
     handler $ DataSet {size = n, elemAt = at}
-
-
--- -- | Use disk or vector dataset representation depending on
--- -- the first argument: when `True`, use `withDisk`, otherwise
--- -- use `withVect`.
--- withData :: Binary a => Bool -> [a] -> (DataSet a -> IO b) -> IO b
--- withData x = case x of
---     True    -> withDisk
---     False   -> withVect
 
 
 -------------------------------------------

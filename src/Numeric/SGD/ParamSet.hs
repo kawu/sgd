@@ -9,9 +9,6 @@
 
 module Numeric.SGD.ParamSet
   ( ParamSet(..)
---   -- * Parameter map 
---   , ParamMap (..)
---   , lookup
   ) where
 
 
@@ -20,27 +17,34 @@ import           GHC.TypeNats (KnownNat)
 
 import           Prelude hiding (div)
 
--- import qualified Data.Map.Strict as M
+import qualified Data.Map.Strict as M
 
 import qualified Numeric.LinearAlgebra.Static as LA
 
 
 -- | Class of types that can be treated as parameter sets.  It provides basic
--- element-wise opertations (addition, multiplication, mapping) which are
+-- element-wise operations (addition, multiplication, mapping) which are
 -- required to perform stochastic gradient descent.  Many of the operations
 -- (`add`, `mul`, `sub`, `div`, etc.) have the same interpretation and follow
 -- the same laws (e.g. associativity) as the corresponding operations in `Num`
--- and `Fractional`.
+-- and `Fractional`.  
+-- 
+-- `zero` takes a parameter set as argument and "zero out"'s all its elements
+-- (as in the backprop library).  This allows instances for `Maybe`, `M.Map`,
+-- etc., where the structure of the parameter set is dynamic.  This leads to
+-- the following property:
 --
--- Objects of this class can be also seen as a containers of parameters, hence
--- `pmap`, which can be seen as a monomorphic version of `fmap`.
+--     @add (zero x) x = x@
 --
--- Alternatively, a `ParamSet` can be seen as a (structured) vector, hence
--- `norm_2`.  This function is not stricktly necessary to perform SGD, but can
--- be useful to control the training behavior.
+-- However, `zero` does not have to obey @(add (zero x) y = y)@.
 --
--- Minimal complete definition: ``pmap`, (`add` or `sub`), (`mul` or `div`),
--- and `norm_2`.
+-- A `ParamSet` can be also seen as a (structured) vector, hence `pmap` and
+-- `norm_2`.  The latter is not strictly necessary to perform SGD, but it is
+-- useful to control the training process.
+--
+-- `pmap` should obey the following law:
+--
+--     @pmap id x = x@
 --
 -- If you leave the body of an instance declaration blank, GHC Generics will be
 -- used to derive instances if the type has a single constructor and each field
@@ -388,33 +392,14 @@ instance GPMap f => GPMap (M1 i c f) where
 --------------------------------------------------
 
 
--- | As in the backprop library, `Nothing` is treated the same as `Just 0`.
--- Special case: `div` gives `Nothing` if both arguments are `Nothing`.
-instance (ParamSet a) => ParamSet (Maybe a) where
-  zero = fmap zero
-  pmap = fmap . pmap
-
-  add Nothing Nothing = Nothing
-  add (Just x) Nothing = Just x
-  add Nothing (Just y) = Just y
-  add (Just x) (Just y) = Just (add x y)
-
-  sub Nothing Nothing = Nothing
-  sub (Just x) Nothing = Just x
-  sub Nothing (Just y) = Just (pmap negate y)
-  sub (Just x) (Just y) = Just (sub x y)
-
-  mul Nothing Nothing = Nothing
-  mul (Just _) Nothing = Nothing
-  mul Nothing (Just _) = Nothing
-  mul (Just x) (Just y) = Just (mul x y)
-
-  div Nothing Nothing = Nothing
-  div (Just _) Nothing = error "ParamSet.div: division by Nothing"
-  div Nothing (Just _) = Nothing
-  div (Just x) (Just y) = Just (div x y)
-
-  norm_2 = maybe 0 norm_2
+instance ParamSet Double where
+  zero = const 0
+  pmap = id
+  add = (+)
+  sub = (-)
+  mul = (*)
+  div = (/)
+  norm_2 = id
 
 
 instance (KnownNat n) => ParamSet (LA.R n) where
@@ -437,41 +422,44 @@ instance (KnownNat n, KnownNat m) => ParamSet (LA.L n m) where
   norm_2 = LA.norm_2
 
 
---------------------------------------------------
--- Parameter map
---------------------------------------------------
+-- | `Nothing` represents a deactivated parameter set component. If `Nothing`
+-- is given as an argument to one of the `ParamSet` operations, the result is
+-- `Nothing` as well.
+--
+-- This differs from the corresponding instance in the backprop library, where
+-- `Nothing` is equivalent to `Just 0`.  However, the implementation below
+-- seems to correspond adequately enough to the notion that a particular
+-- component is either active or not in both the parameter set and the
+-- gradient, hence it doesn't make sense to combine `Just` with `Nothing`.
+instance (ParamSet a) => ParamSet (Maybe a) where
+  zero = fmap zero
+  pmap = fmap . pmap
+
+  add (Just x) (Just y) = Just (add x y)
+  add _ _ = Nothing
+
+  sub (Just x) (Just y) = Just (sub x y)
+  sub _ _ = Nothing
+
+  mul (Just x) (Just y) = Just (mul x y)
+  mul _ _ = Nothing
+
+  div (Just x) (Just y) = Just (div x y)
+  div _ _ = Nothing
+
+  norm_2 = maybe 0 norm_2
 
 
--- -- | Parameter map.  Each key not in the map is treated as `0` (modulo
--- -- `postFun`).
--- data ParamMap k a = ParamMap
---   { unParamMap :: M.Map k a
---     -- ^ The map itself
---   , postFun :: Double -> Double
---     -- ^ Post-processing function to be applied (with `pmap`) to each value in
---     -- the map.  Needed to correctl implement `pmap`.
---   } deriving (Generic)
--- 
--- 
--- -- | Lookup the value by key in the map.
--- lookup :: (Ord k, ParamSet a) => k -> ParamMap k a -> Maybe a
--- lookup k m = pmap (postFun m) <$> M.lookup k (unParamMap m)
--- 
--- 
--- instance (ParamSet a) => ParamSet (ParamMap k a) where
---   zero = ParamMap M.empty id
---   pmap f m = m {postFun = f . postFun m}
--- 
---   add = M.unionWith SGD.add
--- --   sub x y = M.unions
--- --     [ x `M.difference` y
--- --     , M.unionWith SGD.add x y
--- --     , SGD.pmap negate (y `M.difference` x)
--- --     ]
--- --   mul = M.intersectionWith SGD.mul
--- 
---   add = undefined
---   sub = undefined
---   mul = undefined
---   div = undefined
---   norm_2 = undefined
+-- | A map with different parameter sets (of the same type) assigned to the
+-- individual keys.
+--
+-- When combining two maps with different sets of keys, only their intersection
+-- is preserved.
+instance (Ord k, ParamSet a) => ParamSet (M.Map k a) where
+  zero = fmap zero
+  pmap f = fmap (pmap f)
+  add = M.intersectionWith add
+  sub = M.intersectionWith sub
+  mul= M.intersectionWith mul
+  div= M.intersectionWith div
+  norm_2 = sqrt . sum . map ((^(2::Int)) . norm_2)  . M.elems
