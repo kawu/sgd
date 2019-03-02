@@ -19,15 +19,17 @@ module Numeric.SGD.DataSet
 
 
 import           Control.Monad (forM_)
-import           Data.Binary (Binary, encodeFile, decode)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
+import qualified Control.Monad.State.Strict as S
+
 import           System.IO.Temp (withTempDirectory)
 import           System.IO.Unsafe (unsafeInterleaveIO)
 import           System.FilePath ((</>))
 import qualified System.Random as R
+
+import           Data.Binary (Binary, encodeFile, decode)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
-import qualified Control.Monad.State.Strict as S
 
 
 ------------------------------- 
