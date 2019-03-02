@@ -10,7 +10,6 @@
 module Numeric.SGD.AdaDelta
   ( Config(..)
   , def
-  -- , adaDeltaM
   , adaDelta
   ) where
 
@@ -19,6 +18,8 @@ import           GHC.Generics (Generic)
 
 import           Prelude hiding (div)
 -- import           Control.Monad (when)
+
+import           Data.Default
 
 import qualified Pipes as P
 
@@ -34,13 +35,11 @@ data Config = Config
     -- ^ Epsilon value
   } deriving (Show, Eq, Ord, Generic)
 
-
--- | Default AdaDelta configuration
-def :: Config
-def = Config
-  { decay = 0.9
-  , eps = 1.0e-6
-  }
+instance Default Config where
+  def = Config
+    { decay = 0.9
+    , eps = 1.0e-6
+    }
 
 
 -- | Perform gradient descent using the AdaDelta algorithm.

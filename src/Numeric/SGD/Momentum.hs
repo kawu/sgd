@@ -16,6 +16,8 @@ module Numeric.SGD.Momentum
 
 import           GHC.Generics (Generic)
 
+import           Data.Default
+
 import qualified Pipes as P
 
 import           Numeric.SGD.ParamSet
@@ -31,14 +33,12 @@ data Config = Config
   -- ^ Momentum term
   } deriving (Show, Eq, Ord, Generic)
 
-
--- | Default momentum configuration
-def :: Config
-def = Config
-  { gain0 = 0.01
-  , gamma = 0.9
-  , tau = 1000
-  }
+instance Default Config where
+  def = Config
+    { gain0 = 0.01
+    , gamma = 0.9
+    , tau = 1000
+    }
 
 
 -- | Stochastic gradient descent with momentum.

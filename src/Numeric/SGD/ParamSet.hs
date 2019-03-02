@@ -399,7 +399,7 @@ instance ParamSet Double where
   sub = (-)
   mul = (*)
   div = (/)
-  norm_2 = id
+  norm_2 = abs
 
 
 instance (KnownNat n) => ParamSet (LA.R n) where

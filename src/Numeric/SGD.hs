@@ -13,14 +13,12 @@
 
 module Numeric.SGD
   (
-  -- * Configuration
-    Method (..)
-
   -- * Pure SGD
-  , runSgd
+    runSgd
 
   -- * IO-based SGD
   , Config (..)
+  , def
   , runSgdIO
 
   -- * Combinators
@@ -44,13 +42,14 @@ import           Control.Monad (when, forM_)
 
 import           Data.Functor.Identity (Identity(..))
 import qualified Data.IORef as IO
+import           Data.Default
 
 import qualified Pipes as P
 import qualified Pipes.Prelude as P
 import           Pipes ((>->))
 
-import qualified Numeric.SGD.AdaDelta as Ada
-import qualified Numeric.SGD.Momentum as Mom
+-- import qualified Numeric.SGD.AdaDelta as Ada
+-- import qualified Numeric.SGD.Momentum as Mom
 import           Numeric.SGD.ParamSet
 import           Numeric.SGD.DataSet
 
@@ -60,11 +59,11 @@ import           Numeric.SGD.DataSet
 -------------------------------
 
 
--- | Available SGD methods, together with the corresponding configurations
-data Method
-  = AdaDelta Ada.Config
-  | Momentum Mom.Config
-  deriving (Show, Eq, Ord, Generic)
+-- -- | Available SGD methods, together with the corresponding configurations
+-- data Method
+--   = AdaDelta Ada.Config
+--   | Momentum Mom.Config
+--   deriving (Show, Eq, Ord, Generic)
 
 
 -------------------------------
@@ -73,13 +72,13 @@ data Method
 
 
 -- | Pure SGD method
-type SGD e p = p -> P.Pipe e p Identity ()
+type SGD m e p = p -> P.Pipe e p m ()
 
 
 -- | Stochastic gradient descent, pure and simple
 runSgd
   :: (ParamSet p)
-  => SGD e p
+  => SGD Identity e p
     -- ^ Selected SGD method
   -> [e]
     -- ^ Training data stream
@@ -103,14 +102,18 @@ data Config = Config
   , batchRandom :: Bool
     -- ^ Should the mini-batch be selected at random?  If not, the subsequent
     -- training elements will be picked sequentially.  Random selection gives
-    -- no guarantee of seeing each training sample in every epoch.  Use `False`
-    -- if unsure.
-  , method :: Method
-    -- ^ Selected SGD method
-  , reportPeriod :: Double
+    -- no guarantee of seeing each training sample in every epoch.
+  , reportEvery :: Double
     -- ^ How often the quality should be reported (with `1` meaning once per
     -- pass over the training data)
   } deriving (Show, Eq, Ord, Generic)
+
+instance Default Config where
+  def = Config
+    { iterNum = 100
+    , batchRandom = False
+    , reportEvery = 1.0
+    }
 
 
 -- | Higher-level, IO-embedded stochastic gradient descent, which should be
@@ -122,26 +125,21 @@ data Config = Config
 runSgdIO
   :: (ParamSet p)
   => Config
-  -> DataSet e
-    -- ^ Training dataset
-  -> (e -> p -> p)
-    -- ^ Network gradient on a sample element
+    -- ^ SGD configuration
+  -> SGD IO e p
+    -- ^ Selected SGD method
   -> (e -> p -> Double)
     -- ^ Value of the objective function on a sample element (needed for model
     -- quality reporting)
+  -> DataSet e
+    -- ^ Training dataset
   -> p
     -- ^ Initial parameter values
   -> IO p
-runSgdIO Config{..} dataSet grad0 quality0 net0 = do
-  let sgdPipe =
-        case method of
-          Momentum cfg -> Mom.momentum cfg
-            -- (cfg {Mom.tau = iterScale (Mom.tau cfg)})
-            grad0 net0
-          AdaDelta cfg -> Ada.adaDelta cfg grad0 net0
+runSgdIO Config{..} sgd quality0 dataSet net0 = do
   report net0
   result net0 $ pipeSeq dataSet
-    >-> sgdPipe
+    >-> sgd net0
     >-> P.take realIterNum
     >-> every realReportPeriod report
   where
@@ -149,7 +147,7 @@ runSgdIO Config{..} dataSet grad0 quality0 net0 = do
     iterScale x = fromIntegral (size dataSet) * x
     -- Number of iterations and reporting period
     realIterNum = ceiling $ iterScale (fromIntegral iterNum :: Double)
-    realReportPeriod = ceiling $ iterScale reportPeriod
+    realReportPeriod = ceiling $ iterScale reportEvery
     -- Network quality over the entire training dataset
     report net = do
       putStr . show =<< quality net
