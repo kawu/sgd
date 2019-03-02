@@ -8,6 +8,7 @@
 module Numeric.SGD.Momentum
   ( Config(..)
   , Args(..)
+  , momentum
   , momentumM
   ) where
 
@@ -16,68 +17,10 @@ import           GHC.Generics (Generic)
 
 import           Control.Monad (when)
 
+import qualified Pipes as P
+
 import           Numeric.SGD.ParamSet
 import           Numeric.SGD.Args
-
-
--- -- | AdaDelta configuration
--- data Config = Config
---   { iterNum :: Int
---     -- ^ Number of iterations to perform
---   , reportEvery :: Int
---     -- ^ The quality will be reported every `reportEvery` iterations
---   , gain0 :: Double
---   -- ^ Initial gain parameter
---   , tau :: Double
---   -- ^ After how many gradient calculations the gain parameter is halved
---   , gamma :: Double
---   -- ^ Exponentional decay parameter
---   }
--- 
--- 
--- -- | Perform simple gradient descent with momentum.
--- momentum 
---   :: (ParamSet p)
---   => Config
---     -- ^ Momentum configuration
---   -> (p -> IO p)
---     -- ^ Gradient on (some part of) the training data w.r.t. the given
---     -- parameter set.  Embedded in the IO monad because of the stochasticity of
---     -- the process.
---   -> (p -> IO Double)
---     -- ^ Quality measure.  Embedded in the IO monad for convenience.  You
---     -- may, for instance, pick a random subset of the training dataset to
---     -- calculate the quality.
---   -> p 
---     -- ^ Initial parameters
---   -> IO p
--- momentum Config{..} gradient quality net0 =
--- 
---   go 0 (zero net0) net0
--- 
---   where
--- 
---     -- Gain in the k-th iteration
---     gain k
---       = (gain0 * tau)
---       / (tau + fromIntegral k)
--- 
---     go k moment net
---       | k > iterNum = return net
---       | otherwise = do
---           let netSize = norm_2 net
---           when (k `mod` reportEvery == 0) $ do
---             putStr . show =<< quality net
---             putStrLn $ " (norm_2 = " ++ show netSize ++ ")"
---           grad <- scale (gain k) <$> gradient net
---           let moment' = scale gamma moment `add` grad
---               newNet = net `sub` moment'
---           go (k+1) moment' newNet
-
-
--------------------------------
--- New version
--------------------------------
 
 
 -- | Momentum configuration
@@ -121,6 +64,36 @@ momentumM Config{..} Args{..} net0 =
           let moment' = scale gamma moment `add` grad
               newNet = net `sub` moment'
           go (k+1) moment' newNet
+
+
+-- | Stochastic gradient descent with momentum.
+momentum
+  :: (Monad m, ParamSet p)
+  => Config
+    -- ^ Momentum configuration
+  -> (e -> p -> p)
+    -- ^ Gradient on a training element.
+  -> p 
+    -- ^ Initial parameters
+  -> P.Pipe e p m ()
+momentum Config{..} gradient net0 =
+
+  go (0 :: Integer) (zero net0) net0
+
+  where
+
+    -- Gain in the k-th iteration
+    gain k
+      = (gain0 * tau)
+      / (tau + fromIntegral k)
+
+    go k moment net = do
+      x <- P.await
+      let grad = scale (gain k) (gradient x net)
+          moment' = scale gamma moment `add` grad
+          newNet = net `sub` moment'
+      P.yield newNet
+      go (k+1) moment' newNet
 
 
 -------------------------------

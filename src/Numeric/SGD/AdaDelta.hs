@@ -10,6 +10,7 @@
 module Numeric.SGD.AdaDelta
   ( Config(..)
   , adaDeltaM
+  , adaDelta
   ) where
 
 
@@ -17,6 +18,8 @@ import           GHC.Generics (Generic)
 
 import           Prelude hiding (div)
 import           Control.Monad (when)
+
+import qualified Pipes as P
 
 import           Numeric.SGD.ParamSet
 import           Numeric.SGD.Args
@@ -66,6 +69,38 @@ adaDeltaM Config{..} Args{..} net0 =
               -- delta = scale 0.01 grad `div` rmsGrad
               newNet = net `sub` delta
           go (k+1) expSqGrad expSqDelta delta newNet
+
+
+-- | Perform gradient descent using the AdaDelta algorithm.
+adaDelta
+  :: (Monad m, ParamSet p)
+  => Config
+    -- ^ AdaDelta configuration
+  -> (e -> p -> p)
+    -- ^ Gradient on a training element.
+  -> p 
+    -- ^ Initial parameters
+  -> P.Pipe e p m ()
+adaDelta Config{..} gradient net0 =
+
+  let zr = zero net0 
+   in go (0 :: Integer) zr zr zr net0
+
+  where
+
+    go k expSqGradPrev expSqDeltaPrev deltaPrev net = do
+      x <- P.await
+      let grad = gradient x net
+          expSqGrad = scale decay expSqGradPrev
+                `add` scale (1-decay) (square grad)
+          rmsGrad = squareRoot (pmap (+eps) expSqGrad)
+          expSqDelta = scale decay expSqDeltaPrev
+                 `add` scale (1-decay) (square deltaPrev)
+          rmsDelta = squareRoot (pmap (+eps) expSqDelta)
+          delta = (rmsDelta `mul` grad) `div` rmsGrad
+          newNet = net `sub` delta
+      P.yield newNet
+      go (k+1) expSqGrad expSqDelta delta newNet
 
 
 -------------------------------

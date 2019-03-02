@@ -24,6 +24,7 @@ library
     build-depends:
         base            >= 4        && < 5
       , containers      >= 0.4      && < 0.7
+      , pipes           >= 4.3      && < 4.4
       , vector          >= 0.10     && < 0.13
       , random          >= 1.0      && < 1.2
       , primitive       >= 0.5      && < 0.7
@@ -39,6 +40,7 @@ library
 
     exposed-modules:
         Numeric.SGD
+      , Numeric.SGD.Pipe
       , Numeric.SGD.AdaDelta
       , Numeric.SGD.Momentum
       , Numeric.SGD.DataSet
