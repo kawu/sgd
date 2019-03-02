@@ -9,6 +9,7 @@
 
 module Numeric.SGD.Momentum
   ( Config(..)
+  , def
   , momentum
   ) where
 
@@ -29,6 +30,15 @@ data Config = Config
   , gamma :: Double
   -- ^ Momentum term
   } deriving (Show, Eq, Ord, Generic)
+
+
+-- | Default momentum configuration
+def :: Config
+def = Config
+  { gain0 = 0.01
+  , gamma = 0.9
+  , tau = 1000
+  }
 
 
 -- | Stochastic gradient descent with momentum.

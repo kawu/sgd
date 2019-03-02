@@ -9,6 +9,7 @@
 
 module Numeric.SGD.AdaDelta
   ( Config(..)
+  , def
   -- , adaDeltaM
   , adaDelta
   ) where
@@ -32,6 +33,14 @@ data Config = Config
   , eps   :: Double
     -- ^ Epsilon value
   } deriving (Show, Eq, Ord, Generic)
+
+
+-- | Default AdaDelta configuration
+def :: Config
+def = Config
+  { decay = 0.9
+  , eps = 1.0e-6
+  }
 
 
 -- | Perform gradient descent using the AdaDelta algorithm.

@@ -13,13 +13,15 @@
 
 module Numeric.SGD
   (
-  -- * Pure SGD
+  -- * Configuration
     Method (..)
-  , sgd
+
+  -- * Pure SGD
+  , runSgd
 
   -- * IO-based SGD
   , Config (..)
-  , sgdIO
+  , runSgdIO
 
   -- * Combinators
   , pipeSeq
@@ -40,7 +42,7 @@ import qualified System.Random as R
 
 import           Control.Monad (when, forM_)
 
-import           Data.Functor.Identity (runIdentity)
+import           Data.Functor.Identity (Identity(..))
 import qualified Data.IORef as IO
 
 import qualified Pipes as P
@@ -60,36 +62,33 @@ import           Numeric.SGD.DataSet
 
 -- | Available SGD methods, together with the corresponding configurations
 data Method
-  = AdaDelta {adaDeltaCfg :: Ada.Config}
-  | Momentum {momentumCfg :: Mom.Config}
+  = AdaDelta Ada.Config
+  | Momentum Mom.Config
   deriving (Show, Eq, Ord, Generic)
 
 
-------------------------------- 
+-------------------------------
 -- Pure SGD
 -------------------------------
 
 
--- | Stochastic gradient descent: pure and simple
-sgd
+-- | Pure SGD method
+type SGD e p = p -> P.Pipe e p Identity ()
+
+
+-- | Stochastic gradient descent, pure and simple
+runSgd
   :: (ParamSet p)
-  => Method
-    -- ^ SGD method
+  => SGD e p
+    -- ^ Selected SGD method
   -> [e]
     -- ^ Training data stream
-  -> (e -> p -> p)
-    -- ^ Gradient on a training element
   -> p
-    -- ^ Initial parameter values
+    -- ^ Initial parameters
   -> p
-sgd method dataSet gradient p0 = runIdentity $
+runSgd sgd dataSet p0 = runIdentity $
   result p0 
-    (P.each dataSet >-> sgdPipe gradient p0)
-  where
-    sgdPipe =
-      case method of
-        Momentum cfg -> Mom.momentum cfg
-        AdaDelta cfg -> Ada.adaDelta cfg
+    (P.each dataSet >-> sgd p0)
 
 
 ------------------------------- 
@@ -120,7 +119,7 @@ data Config = Config
 -- An alternative is to use the simpler `sgd`, or to build a custom SGD
 -- pipeline based on lower-level combinators (`pipeSeq`, `Ada.adaDelta`,
 -- `every`, `result`, etc.).
-sgdIO
+runSgdIO
   :: (ParamSet p)
   => Config
   -> DataSet e
@@ -133,7 +132,7 @@ sgdIO
   -> p
     -- ^ Initial parameter values
   -> IO p
-sgdIO Config{..} dataSet grad0 quality0 net0 = do
+runSgdIO Config{..} dataSet grad0 quality0 net0 = do
   let sgdPipe =
         case method of
           Momentum cfg -> Mom.momentum cfg
