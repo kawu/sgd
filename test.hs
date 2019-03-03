@@ -4,6 +4,7 @@
 
 
 import           Control.Arrow (first, second)
+import qualified Numeric.AD as AD
 import qualified Numeric.Backprop as BP
 import           Numeric.Backprop (BVar, W, Reifies)
 import qualified Numeric.SGD as SGD
@@ -11,55 +12,78 @@ import qualified Numeric.SGD.Momentum as Mom
 import qualified Numeric.SGD.AdaDelta as Ada
 
 
-foo :: (forall a. a -> a) -> Int
-foo _ = undefined
-
-bar :: forall b. Bool -> b -> b
-bar = undefined
-
-test1 :: Bool -> Int
-test1 x = foo (bar x)
-
--- test2 :: Bool -> Int
--- test2 = foo . bar
-
-
 --------------------------------------------------
--- TEST 2.2
+-- TEST 3
 --------------------------------------------------
 
 
--- | To bypass the impredicative polymorphism issue
-newtype Fun = Fun { unFun :: forall a. Floating a => a -> a }
-
-
-objectives :: [Fun]
-objectives =
-  [ Fun $ \x -> 0.3*x^2
-  , Fun $ \x -> -2*x
-  , Fun $ const 3
-  , Fun sin
+-- | The component objective functions
+funs =
+  [ \x -> 0.3*x^2
+  , \x -> -2*x
+  , const 3
+  , sin
   ]
 
 
+-- | The corresponding derivatives
+derivs = map
+  (\k -> AD.diff (funs !! k))
+  [0 .. length funs - 1]
+--   [ \x -> 0.6*x
+--   , const (-2)
+--   , const 0
+--   , cos
+--   ]
+
+
 -- | The total objective is the sum of the objective component functions
-objective :: Double -> Double
-objective x = sum $ map (($x) . unFun) objectives
-
-
--- | Gradient of a function for a given argument
-grad :: Fun -> Double -> Double
-grad (Fun f) x = BP.gradBP f x
+objective x = sum $ map ($x) funs
 
 
 main1 = print $
   SGD.runSgd
-    (Mom.momentum Mom.def grad)
-    -- (Ada.adaDelta Ada.def grad)
-    (take 10000 $ cycle objectives)
-    0.0
+    (Mom.momentum Mom.def id)
+    (take 10000 $ cycle derivs)
+    (0.0 :: Double)
 
 
+-- --------------------------------------------------
+-- -- TEST 2.2
+-- --------------------------------------------------
+-- 
+-- 
+-- -- | To bypass the impredicative polymorphism issue
+-- newtype Fun = Fun { unFun :: forall a. Floating a => a -> a }
+-- 
+-- 
+-- objectives :: [Fun]
+-- objectives =
+--   [ Fun $ \x -> 0.3*x^2
+--   , Fun $ \x -> -2*x
+--   , Fun $ const 3
+--   , Fun sin
+--   ]
+-- 
+-- 
+-- -- | The total objective is the sum of the objective component functions
+-- objective :: Double -> Double
+-- objective x = sum $ map (($x) . unFun) objectives
+-- 
+-- 
+-- -- | Gradient of a function for a given argument
+-- grad :: Fun -> Double -> Double
+-- grad (Fun f) x = BP.gradBP f x
+-- 
+-- 
+-- main1 = print $
+--   SGD.runSgd
+--     (Mom.momentum Mom.def grad)
+--     -- (Ada.adaDelta Ada.def grad)
+--     (take 10000 $ cycle objectives)
+--     0.0
+-- 
+-- 
 -- --------------------------------------------------
 -- -- TEST 2.1
 -- --------------------------------------------------

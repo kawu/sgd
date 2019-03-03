@@ -2,13 +2,38 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 
--- | High-level stochastic gradient descent (SGD) module.
+-- | Main module of the stochastic gradient descent (SGD) library. 
 --
--- SGD can be used to find the optimal parameter values, minimizing a given
--- objective function.  This module requires that (i) the parameters have a
--- `ParamSet` instance, and (ii) the gradient of the objective function is
--- known (you can determine it automatically using, e.g., the backprop
--- library).
+-- SGD is a method for optimizing a global objective function, defined as the
+-- sum of smaller, differentiable objective functions.  The individual
+-- objective functions share the same set of parameters, represented by the
+-- `ParamSet` class.
+--
+-- To perform SGD, the gradients of the individual objective functions need to
+-- be determined.  This can be done manually or automatically, using one of the
+-- available automatic differentiation libraries (ad, backprop).
+--
+-- For instance, let's say we have a list of objective functions as follows:
+--
+-- >>> let funs = [\x -> 0.3*x^2, \x -> -2*x, const 3, sin]
+--
+-- And the the global objective is defined as:
+--
+-- >>> let objective x = sum $ map ($x) funs
+--
+-- Then we can manually determine their individual derivatives:
+--
+-- >>> let derivs = [\x -> 0.6*x, const (-2), const 0, cos]
+--
+-- An alternative is to use an automatic differentiation library:
+--
+-- >>> import qualified Numeric.AD as AD
+-- >>> let derivs = map (\k -> AD.diff (funs !! k)) [0..length funs-1]
+--
+-- Finally, we can pick a SGD variant (here: `momentum`) and use `runSgd` to
+-- determine a (potentially local) minimum:
+--
+-- >>> runSgd (momentum def id) (take 10000 $ cycle derivs) 0.0
 
 
 module Numeric.SGD
