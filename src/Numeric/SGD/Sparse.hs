@@ -4,12 +4,12 @@
 -- | Stochastic gradient descent using mutable vectors for efficient parameter
 -- update.  This module is intended for use with sparse features.  If you use
 -- dense feature vectors (as arise e.g. in deep learning), have a look at
--- `Numeric.SGD`.
+-- "Numeric.SGD".
 -- 
 -- Currently only the Gaussian regularization is implemented.
 --
 -- SGD with momentum is known to converge faster than vanilla SGD.  It's
--- implementation can be found in `Numeric.SGD.Sparse.Momentum`.
+-- implementation can be found in "Numeric.SGD.Sparse.Momentum".
 
 
 module Numeric.SGD.Sparse

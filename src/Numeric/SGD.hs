@@ -4,47 +4,60 @@
 
 -- | Main module of the stochastic gradient descent (SGD) library. 
 --
--- SGD is a method for optimizing a global objective function, defined as the
--- sum of smaller, differentiable objective functions.  The individual
--- objective functions share the same set of parameters, represented by the
--- `ParamSet` class.
+-- SGD is a method for optimizing a global objective function defined as a sum
+-- of smaller, differentiable functions.  The individual component functions
+-- share the same set of parameters, represented by the `ParamSet` class.
 --
--- To perform SGD, the gradients of the individual objective functions need to
--- be determined.  This can be done manually or automatically, using one of the
--- available automatic differentiation libraries (ad, backprop).
+-- To perform SGD, the gradients of the individual functions need to be
+-- determined.  This can be done manually or automatically, using one of the
+-- automatic differentiation libraries (ad, backprop) available in Haskell.
 --
--- For instance, let's say we have a list of objective functions as follows:
+-- For instance, let's say we have a list of functions defined as:
 --
--- >>> let funs = [\x -> 0.3*x^2, \x -> -2*x, const 3, sin]
+-- > funs = [\x -> 0.3*x^2, \x -> -2*x, const 3, sin]
 --
--- And the the global objective is defined as:
+-- The global objective is then defined as:
 --
--- >>> let objective x = sum $ map ($x) funs
+-- > objective x = sum $ map ($x) funs
 --
--- Then we can manually determine their individual derivatives:
+-- We can manually determine the individual derivatives:
 --
--- >>> let derivs = [\x -> 0.6*x, const (-2), const 0, cos]
+-- > derivs = [\x -> 0.6*x, const (-2), const 0, cos]
 --
--- An alternative is to use an automatic differentiation library:
+-- or use an automatic differentiation library, for instance:
 --
--- >>> import qualified Numeric.AD as AD
--- >>> let derivs = map (\k -> AD.diff (funs !! k)) [0..length funs-1]
+-- > import qualified Numeric.AD as AD
+-- > derivs = map
+-- >   (\k -> AD.diff (funs !! k))
+-- >   [0..length funs-1]
 --
--- Finally, we can pick a SGD variant (here: `momentum`) and use `runSgd` to
--- determine a (potentially local) minimum:
+-- Finally, `run` allows to approach a (potentially local) minimum of the
+-- global objective function:
 --
--- >>> runSgd (momentum def id) (take 10000 $ cycle derivs) 0.0
+-- >>> run (momentum def id) (take 10000 $ cycle derivs) 0.0
+-- 4.180177042912455
+--
+-- where:
+-- 
+--     * @(take 10000 $ cycle derivs)@ is the stream of training examples
+--     * @(momentum def id)@ is the selected SGD variant (`Mom.momentum`),
+--     supplied with the default configuration (`def`) and the function (`id`)
+--     for calculating the gradient from a training example
+--     * @0.0@ is the initial parameter value
 
 
 module Numeric.SGD
   (
+  -- * SGD variants
+    Mom.momentum
+  , Ada.adaDelta
+
   -- * Pure SGD
-    runSgd
+  , run
 
   -- * IO-based SGD
   , Config (..)
-  , def
-  , runSgdIO
+  , runIO
 
   -- * Combinators
   , pipeSeq
@@ -53,8 +66,7 @@ module Numeric.SGD
   , every
 
   -- * Re-exports
-  , module Numeric.SGD.ParamSet
-  , module Numeric.SGD.DataSet
+  , def
   ) where
 
 
@@ -73,22 +85,11 @@ import qualified Pipes as P
 import qualified Pipes.Prelude as P
 import           Pipes ((>->))
 
--- import qualified Numeric.SGD.AdaDelta as Ada
--- import qualified Numeric.SGD.Momentum as Mom
+import qualified Numeric.SGD.AdaDelta as Ada
+import qualified Numeric.SGD.Momentum as Mom
+import           Numeric.SGD.Type
 import           Numeric.SGD.ParamSet
 import           Numeric.SGD.DataSet
-
-
-------------------------------- 
--- Config
--------------------------------
-
-
--- -- | Available SGD methods, together with the corresponding configurations
--- data Method
---   = AdaDelta Ada.Config
---   | Momentum Mom.Config
---   deriving (Show, Eq, Ord, Generic)
 
 
 -------------------------------
@@ -96,12 +97,12 @@ import           Numeric.SGD.DataSet
 -------------------------------
 
 
--- | Pure SGD method
-type SGD m e p = p -> P.Pipe e p m ()
-
-
--- | Stochastic gradient descent, pure and simple
-runSgd
+-- | Traverse all the elements in the training data stream in one pass,
+-- calculate the subsequent gradients, and apply them progressively starting
+-- from the initial parameter values.
+--
+-- Consider using `runIO` if your training dataset is large.
+run
   :: (ParamSet p)
   => SGD Identity e p
     -- ^ Selected SGD method
@@ -110,7 +111,7 @@ runSgd
   -> p
     -- ^ Initial parameters
   -> p
-runSgd sgd dataSet p0 = runIdentity $
+run sgd dataSet p0 = runIdentity $
   result p0 
     (P.each dataSet >-> sgd p0)
 
@@ -129,8 +130,8 @@ data Config = Config
     -- training elements will be picked sequentially.  Random selection gives
     -- no guarantee of seeing each training sample in every epoch.
   , reportEvery :: Double
-    -- ^ How often the quality should be reported (with `1` meaning once per
-    -- pass over the training data)
+    -- ^ How often the value of the objective function should be reported (with
+    -- `1` meaning once per pass over the training data)
   } deriving (Show, Eq, Ord, Generic)
 
 instance Default Config where
@@ -141,13 +142,14 @@ instance Default Config where
     }
 
 
--- | Higher-level, IO-embedded stochastic gradient descent, which should be
--- enough to train models on large datasets.
+-- | Perform SGD in the IO monad, regularly reporting the value of the
+-- objective function on the entire dataset.  A higher-level wrapper which
+-- should be convenient to use when the training dataset is large.
 --
--- An alternative is to use the simpler `sgd`, or to build a custom SGD
--- pipeline based on lower-level combinators (`pipeSeq`, `Ada.adaDelta`,
+-- An alternative is to use the simpler function `run`, or to build a custom
+-- SGD pipeline based on lower-level combinators (`pipeSeq`, `Ada.adaDelta`,
 -- `every`, `result`, etc.).
-runSgdIO
+runIO
   :: (ParamSet p)
   => Config
     -- ^ SGD configuration
@@ -161,7 +163,7 @@ runSgdIO
   -> p
     -- ^ Initial parameter values
   -> IO p
-runSgdIO Config{..} sgd quality0 dataSet net0 = do
+runIO Config{..} sgd quality0 dataSet net0 = do
   report net0
   result net0 $ pipeSeq dataSet
     >-> sgd net0

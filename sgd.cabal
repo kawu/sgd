@@ -4,19 +4,17 @@ synopsis:           Stochastic gradient descent
 description:
     Stochastic gradient descent library.
     .
-    This is a preliminary version, API may change in future versions.
+    Import "Numeric.SGD" to use the library.
 license:            BSD3
 license-file:       LICENSE
 cabal-version:      >= 1.6
-copyright:          Copyright (c) 2019 Jakub Waszczuk
+copyright:          Copyright (c) 2012-2019 Jakub Waszczuk
 author:             Jakub Waszczuk
 maintainer:         waszczuk.kuba@gmail.com
 stability:          experimental
 category:           Math
 homepage:           https://github.com/kawu/sgd
 build-type:         Simple
-
-extra-source-files: examples/example1.hs
 
 library
     hs-source-dirs: src
@@ -41,12 +39,11 @@ library
 
     exposed-modules:
         Numeric.SGD
+      , Numeric.SGD.Type
       , Numeric.SGD.DataSet
       , Numeric.SGD.ParamSet
       , Numeric.SGD.AdaDelta
       , Numeric.SGD.Momentum
-      -- , Numeric.SGD.Args
-      -- , Numeric.SGD.Pipe
       , Numeric.SGD.Sparse
       , Numeric.SGD.Sparse.Momentum
       , Numeric.SGD.Sparse.LogSigned

@@ -9,7 +9,6 @@
 
 module Numeric.SGD.Momentum
   ( Config(..)
-  , def
   , momentum
   ) where
 
@@ -20,6 +19,7 @@ import           Data.Default
 
 import qualified Pipes as P
 
+import           Numeric.SGD.Type
 import           Numeric.SGD.ParamSet
 
 
@@ -41,16 +41,15 @@ instance Default Config where
     }
 
 
--- | Stochastic gradient descent with momentum.
+-- | Stochastic gradient descent with momentum. See "Numeric.SGD.Momentum" for
+-- more information.
 momentum
   :: (Monad m, ParamSet p)
   => Config
     -- ^ Momentum configuration
   -> (e -> p -> p)
     -- ^ Gradient on a training element
-  -> p 
-    -- ^ Initial parameters
-  -> P.Pipe e p m ()
+  -> SGD m e p
 momentum Config{..} gradient net0 =
 
   go (0 :: Integer) (zero net0) net0

@@ -9,7 +9,6 @@
 
 module Numeric.SGD.AdaDelta
   ( Config(..)
-  , def
   , adaDelta
   ) where
 
@@ -23,6 +22,7 @@ import           Data.Default
 
 import qualified Pipes as P
 
+import           Numeric.SGD.Type
 import           Numeric.SGD.ParamSet
 -- import           Numeric.SGD.Args
 
@@ -42,16 +42,15 @@ instance Default Config where
     }
 
 
--- | Perform gradient descent using the AdaDelta algorithm.
+-- | Perform gradient descent using the AdaDelta algorithm.  
+-- See "Numeric.SGD.AdaDelta" for more information.
 adaDelta
   :: (Monad m, ParamSet p)
   => Config
     -- ^ AdaDelta configuration
   -> (e -> p -> p)
     -- ^ Gradient on a training element
-  -> p 
-    -- ^ Initial parameters
-  -> P.Pipe e p m ()
+  -> SGD m e p
 adaDelta Config{..} gradient net0 =
 
   let zr = zero net0 
