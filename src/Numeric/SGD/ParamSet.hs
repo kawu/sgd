@@ -6,6 +6,8 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 
+{-# OPTIONS_GHC -O -ddump-rule-firings #-}
+
 
 module Numeric.SGD.ParamSet
   ( ParamSet(..)
@@ -84,6 +86,7 @@ class ParamSet a where
   pmap = genericPMap
   {-# INLINE pmap #-}
 
+
   default add :: (Generic a, GAdd (Rep a)) => a -> a -> a
   add = genericAdd
   {-# INLINE add #-}
@@ -103,6 +106,11 @@ class ParamSet a where
   default norm_2 :: (Generic a, GNorm2 (Rep a)) => a -> Double
   norm_2 = genericNorm2
   {-# INLINE norm_2 #-}
+
+
+{-# RULES
+"ParamSet pmap/pmap" forall f g p. pmap f (pmap g p) = pmap (f . g) p
+   #-}
 
 
 -- -- | 'add' using GHC Generics; works if all fields are instances of

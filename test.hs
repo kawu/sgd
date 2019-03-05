@@ -42,9 +42,11 @@ objective x = sum $ map ($x) funs
 
 
 main1 = print $
-  SGD.runSgd
-    (Mom.momentum Mom.def id)
-    (take 10000 $ cycle derivs)
+  SGD.run
+    -- (momentum SGD.def id)
+    -- (SGD.adaDelta SGD.def id)
+    (SGD.adam SGD.def id)
+    (take 100000 $ cycle derivs)
     (0.0 :: Double)
 
 

@@ -51,6 +51,7 @@ module Numeric.SGD
   -- * SGD variants
     Mom.momentum
   , Ada.adaDelta
+  , Adam.adam
 
   -- * Pure SGD
   , run
@@ -85,8 +86,9 @@ import qualified Pipes as P
 import qualified Pipes.Prelude as P
 import           Pipes ((>->))
 
-import qualified Numeric.SGD.AdaDelta as Ada
 import qualified Numeric.SGD.Momentum as Mom
+import qualified Numeric.SGD.AdaDelta as Ada
+import qualified Numeric.SGD.Adam as Adam
 import           Numeric.SGD.Type
 import           Numeric.SGD.ParamSet
 import           Numeric.SGD.DataSet

@@ -42,8 +42,9 @@ library
       , Numeric.SGD.Type
       , Numeric.SGD.DataSet
       , Numeric.SGD.ParamSet
-      , Numeric.SGD.AdaDelta
       , Numeric.SGD.Momentum
+      , Numeric.SGD.AdaDelta
+      , Numeric.SGD.Adam
       , Numeric.SGD.Sparse
       , Numeric.SGD.Sparse.Momentum
       , Numeric.SGD.Sparse.LogSigned
