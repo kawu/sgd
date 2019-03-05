@@ -73,11 +73,6 @@ adaDelta Config{..} gradient net0 =
       go (k+1) expSqGrad expSqDelta delta newNet
 
 
--- {-# RULES
--- "ParamSet pmap/pmap" forall f g p. pmap f (pmap g p) = pmap (f . g) p
---    #-}
-
-
 -------------------------------
 -- Utils
 -------------------------------

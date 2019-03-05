@@ -6,7 +6,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-{-# OPTIONS_GHC -O -ddump-rule-firings #-}
+-- {-# OPTIONS_GHC -O -ddump-rule-firings #-}
 
 
 module Numeric.SGD.ParamSet
@@ -110,7 +110,14 @@ class ParamSet a where
 
 {-# RULES
 "ParamSet pmap/pmap" forall f g p. pmap f (pmap g p) = pmap (f . g) p
-   #-}
+  #-}
+
+
+-- {-# RULES
+-- "ParamSet pmap/add/pmap" forall f g p h q. 
+--   pmap f (add (pmap g p) (pmap h q))
+--   = add (pmap (f . g) p) (pmap (f . h) q)
+--   #-}
 
 
 -- -- | 'add' using GHC Generics; works if all fields are instances of
