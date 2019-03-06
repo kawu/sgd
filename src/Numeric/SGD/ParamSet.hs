@@ -9,8 +9,22 @@
 -- {-# OPTIONS_GHC -O -ddump-rule-firings #-}
 
 
+-- | Provides the class `ParamSet` which is used to represent the set of
+-- parameters of a particular model.  The goal of SGD is then to find the
+-- parameter values which minimize a given objective function.
+
+
 module Numeric.SGD.ParamSet
-  ( ParamSet(..)
+  ( 
+  -- * Class
+    ParamSet(..)
+  -- * Generics
+  , GPMap
+  , GAdd
+  , GSub
+  , GDiv
+  , GMul
+  , GNorm2
   ) where
 
 

@@ -1,7 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}
 
 
--- | Dataset abstraction.
+-- | Provides the `DataSet` type which abstracts over the actual (IO-based)
+-- representation of the training dataset.
 
 
 module Numeric.SGD.DataSet

@@ -2,9 +2,10 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 
--- | Adam algorithm based on:
+-- | Provides the `adam` function which implements the Adam algorithm based on
+-- the paper:
 --
---     *
+--     * https://arxiv.org/pdf/1412.6980
 
 
 module Numeric.SGD.Adam

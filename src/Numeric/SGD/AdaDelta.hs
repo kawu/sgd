@@ -2,7 +2,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 
--- | AdaDelta algorithm as described in the following paper:
+-- | Provides the `adaDelta` function which implements the AdaDelta algorithm
+-- as described in the following paper:
 --
 --     * https://arxiv.org/pdf/1212.5701.pdf
 

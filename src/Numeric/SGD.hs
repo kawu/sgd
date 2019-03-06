@@ -133,7 +133,7 @@ data Config = Config
     -- no guarantee of seeing each training sample in every epoch.
   , reportEvery :: Double
     -- ^ How often the value of the objective function should be reported (with
-    -- `1` meaning once per pass over the training data)
+    -- @1@ meaning once per pass over the training data)
   } deriving (Show, Eq, Ord, Generic)
 
 instance Default Config where
@@ -229,7 +229,7 @@ result
 result pDef = fmap (maybe pDef id) . P.last
 
 
--- | Apply the given function every `k` param sets flowing downstream.
+-- | Apply the given function every @k@ param sets flowing downstream.
 every :: (Monad m) => Int -> (p -> m ()) -> P.Pipe p p m x
 every k f = do
   go (1 `mod` k)

@@ -2,7 +2,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 
--- | Stochastic gradient descent with momentum, following:
+-- | Provides the `momentum` function which implements stochastic gradient
+-- descent with momentum, following:
 --
 --     * http://ruder.io/optimizing-gradient-descent/index.html#momentum
 
