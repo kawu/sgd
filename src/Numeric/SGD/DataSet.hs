@@ -9,6 +9,7 @@ module Numeric.SGD.DataSet
 ( 
 -- * Dataset
   DataSet (..)
+, shuffle
 -- * Reading
 , loadData
 , randomSample
@@ -26,11 +27,13 @@ import           System.IO.Temp (withTempDirectory)
 import           System.IO.Unsafe (unsafeInterleaveIO)
 import           System.FilePath ((</>))
 import qualified System.Random as R
+import           System.Random.Shuffle (shuffleM)
 
 import           Data.Binary (Binary, encodeFile, decode)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
+import qualified Data.Map.Strict as M
 
 
 ------------------------------- 
@@ -66,6 +69,18 @@ loadData DataSet{..} = lazyMapM elemAt [0 .. size - 1]
 --     let (i, g'') = R.next g'
 --     x <- dataset `elemAt` (i `mod` size dataset)
 --     return (x:xs, g'')
+
+
+-- | Shuffle the dataset.
+shuffle :: DataSet a -> IO (DataSet a)
+shuffle DataSet{..} = do
+  let ixs = [0 .. size - 1]
+  ixs' <- shuffleM ixs
+  let m = M.fromList (zip ixs ixs')
+  return $ DataSet
+    { size = size
+    , elemAt = elemAt . (m M.!)
+    }
 
 
 -- | Random dataset sample with a specified number of elements (loaded eagerly)

@@ -63,6 +63,8 @@ module Numeric.SGD
   -- * Combinators
   , pipeSeq
   , pipeRan
+  , batch
+  , batchGrad
   , result
   , every
 
@@ -74,11 +76,14 @@ module Numeric.SGD
 import           GHC.Generics (Generic)
 import           Numeric.Natural (Natural)
 
-import qualified System.Random as R
+-- import qualified System.Random as R
 
-import           Control.Monad (when, forM_)
+import           Control.Monad (when, forM_, forever)
+import           Control.Parallel.Strategies (rseq, parMap)
+import qualified Control.Monad.State.Strict as State
 
 import           Data.Functor.Identity (Identity(..))
+import           Data.List (foldl1')
 import qualified Data.IORef as IO
 import           Data.Default
 
@@ -127,6 +132,8 @@ run sgd dataSet p0 = runIdentity $
 data Config = Config
   { iterNum :: Natural
     -- ^ Number of iteration over the entire training dataset
+  , batchSize :: Natural
+    -- ^ Mini-batch size
   , batchRandom :: Bool
     -- ^ Should the mini-batch be selected at random?  If not, the subsequent
     -- training elements will be picked sequentially.  Random selection gives
@@ -139,6 +146,7 @@ data Config = Config
 instance Default Config where
   def = Config
     { iterNum = 100
+    , batchSize = 1
     , batchRandom = False
     , reportEvery = 1.0
     }
@@ -155,10 +163,10 @@ runIO
   :: (ParamSet p)
   => Config
     -- ^ SGD configuration
-  -> SGD IO e p
-    -- ^ Selected SGD method
+  -> SGD IO [e] p
+    -- ^ SGD pipe consuming mini-batches of dataset elements
   -> (e -> p -> Double)
-    -- ^ Value of the objective function on a sample element (needed for model
+    -- ^ Value of the objective function on a dataset element (used for model
     -- quality reporting)
   -> DataSet e
     -- ^ Training dataset
@@ -167,12 +175,17 @@ runIO
   -> IO p
 runIO Config{..} sgd quality0 dataSet net0 = do
   report net0
-  result net0 $ pipeSeq dataSet
+  result net0 $ pipeData dataSet
+    >-> batch (fromIntegral batchSize)
     >-> sgd net0
     >-> P.take realIterNum
     >-> every realReportPeriod report
   where
-    -- Iteration scaling
+    pipeData = forever .
+      if batchRandom
+         then pipeRan
+         else pipeSeq
+    -- Iteration (epoch) scaling
     iterScale x = fromIntegral (size dataSet) * x
     -- Number of iterations and reporting period
     realIterNum = ceiling $ iterScale (fromIntegral iterNum :: Double)
@@ -194,27 +207,46 @@ runIO Config{..} sgd quality0 dataSet net0 = do
 -------------------------------
 
 
--- | Pipe the dataset sequentially in a loop.
+-- | Pipe all the elements in the dataset sequentially.
 pipeSeq :: DataSet e -> P.Producer e IO ()
 pipeSeq dataSet = do
   go (0 :: Int)
   where
     go k
-      | k >= size dataSet = go 0
+      | k >= size dataSet = return ()
       | otherwise = do
           x <- P.lift $ elemAt dataSet k
           P.yield x
           go (k+1)
 
 
--- | Pipe the dataset randomly in a loop.
+-- | Pipe all the elements in the dataset in a random order.
 pipeRan :: DataSet e -> P.Producer e IO ()
-pipeRan dataSet = do
-  x <- P.lift $ do
-    ix <- R.randomRIO (0, size dataSet - 1)
-    elemAt dataSet ix
-  P.yield x
-  pipeRan dataSet
+pipeRan dataSet0 = do
+  dataSet <- P.lift $ shuffle dataSet0
+  pipeSeq dataSet
+
+
+-- | Group dataset elements into (mini-)batches of the given size.
+batch :: (Monad m) => Int -> P.Pipe e [e] m ()
+batch k = flip State.evalStateT [] . forever $ do
+  x <- P.lift P.await
+  xs <- State.get
+  let xs' = take k (x:xs)
+  when (length xs' == k) $ do
+    P.lift (P.yield xs')
+  State.put xs'
+
+
+-- | Adapt the gradient function to handle (mini-)batches.
+batchGrad
+  :: (ParamSet p)
+  => (e -> p -> p)
+  -> ([e] -> p -> p)
+batchGrad grad xs param =
+  case parMap rseq (\e -> grad e param) xs of
+    [] -> param
+    ps -> foldl1' add ps
 
 
 -- | Extract the result of the SGD calculation (the last parameter
