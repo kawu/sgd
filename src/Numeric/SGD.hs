@@ -74,6 +74,7 @@ module Numeric.SGD
 
 
 import           GHC.Generics (Generic)
+-- import           GHC.Conc (numCapabilities)
 import           Numeric.Natural (Natural)
 
 -- import qualified System.Random as R
@@ -83,7 +84,8 @@ import           Control.Parallel.Strategies (rseq, parMap)
 import qualified Control.Monad.State.Strict as State
 
 import           Data.Functor.Identity (Identity(..))
-import           Data.List (foldl1')
+import           Data.List (foldl1') -- , transpose)
+
 import qualified Data.IORef as IO
 import           Data.Default
 
@@ -239,11 +241,17 @@ batch k = flip State.evalStateT [] . forever $ do
 
 
 -- | Adapt the gradient function to handle (mini-)batches.
+-- TODO: Mention that `p` has to be strict for parallelism?
 batchGrad
   :: (ParamSet p)
   => (e -> p -> p)
   -> ([e] -> p -> p)
 batchGrad grad xs param =
+--   = foldl1' add
+--   . parMap rseq gradOn
+--   $ partition numCapabilities xs
+--   where
+--     gradOn = foldl1' add . map (flip grad param)
   case parMap rseq (\e -> grad e param) xs of
     [] -> param
     ps -> foldl1' add ps
@@ -272,3 +280,16 @@ every k f = do
         P.lift $ f paramSet
       P.yield paramSet
       go $ (i+1) `mod` k
+
+
+-------------------------------
+-- Utils
+-------------------------------
+
+
+-- partition :: Int -> [a] -> [[a]]
+-- partition n =
+--     transpose . group n
+--   where
+--     group _ [] = []
+--     group k xs = take k xs : (group k $ drop k xs)
