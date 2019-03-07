@@ -80,7 +80,8 @@ import           Numeric.Natural (Natural)
 -- import qualified System.Random as R
 
 import           Control.Monad (when, forM_, forever)
-import           Control.Parallel.Strategies (rseq, parMap)
+import           Control.Parallel.Strategies (parMap, rdeepseq)
+import           Control.DeepSeq (NFData, )
 import qualified Control.Monad.State.Strict as State
 
 import           Data.Functor.Identity (Identity(..))
@@ -242,8 +243,9 @@ batch k = flip State.evalStateT [] . forever $ do
 
 -- | Adapt the gradient function to handle (mini-)batches.
 -- TODO: Mention that `p` has to be strict for parallelism?
+-- UPDATE: not relevant anymore?
 batchGrad
-  :: (ParamSet p)
+  :: (ParamSet p, NFData p)
   => (e -> p -> p)
   -> ([e] -> p -> p)
 batchGrad grad xs param =
@@ -252,9 +254,13 @@ batchGrad grad xs param =
 --   $ partition numCapabilities xs
 --   where
 --     gradOn = foldl1' add . map (flip grad param)
-  case parMap rseq (\e -> grad e param) xs of
+  case parMap rdeepseq (\e -> grad e param) xs of
+  -- case parMap pseq (\e -> grad e param) xs of
     [] -> param
     ps -> foldl1' add ps
+--   where
+--     pseq p = do
+--       norm_2 p `seq` return p
 
 
 -- | Extract the result of the SGD calculation (the last parameter
