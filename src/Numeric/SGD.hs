@@ -67,6 +67,7 @@ module Numeric.SGD
   , batchGrad
   , result
   , every
+  , keepEvery
 
   -- * Re-exports
   , def
@@ -137,6 +138,8 @@ data Config = Config
     -- ^ Number of iteration over the entire training dataset
   , batchSize :: Natural
     -- ^ Mini-batch size
+  , batchOverlap :: Natural
+    -- ^ The number of overlapping elements in subsequent mini-batches
   , batchRandom :: Bool
     -- ^ Should the mini-batch be selected at random?  If not, the subsequent
     -- training elements will be picked sequentially.  Random selection gives
@@ -150,6 +153,7 @@ instance Default Config where
   def = Config
     { iterNum = 100
     , batchSize = 1
+    , batchOverlap = 0
     , batchRandom = False
     , reportEvery = 1.0
     }
@@ -180,6 +184,10 @@ runIO Config{..} sgd quality0 dataSet net0 = do
   report net0
   result net0 $ pipeData dataSet
     >-> batch (fromIntegral batchSize)
+    >-> keepEvery ( max 1
+          $ fromIntegral batchSize
+          - fromIntegral batchOverlap
+          )
     >-> sgd net0
     >-> P.take realIterNum
     >-> every realReportPeriod report
@@ -190,9 +198,10 @@ runIO Config{..} sgd quality0 dataSet net0 = do
          else pipeSeq
     -- Iteration (epoch) scaling
     iterScale x = fromIntegral (size dataSet) * x
+                / (fromIntegral batchSize - fromIntegral batchOverlap)
     -- Number of iterations and reporting period
     realIterNum = ceiling $ iterScale (fromIntegral iterNum :: Double)
-    realReportPeriod = ceiling $ iterScale reportEvery
+    realReportPeriod = floor $ iterScale reportEvery
     -- Network quality over the entire training dataset
     report net = do
       putStr . show =<< quality net
@@ -285,6 +294,18 @@ every k f = do
       when (i == 0) $ do
         P.lift $ f paramSet
       P.yield paramSet
+      go $ (i+1) `mod` k
+
+
+-- | Keep every @k@-th element flowing downstream and discard all the others.
+keepEvery :: (Monad m) => Int -> P.Pipe a a m x
+keepEvery k = do
+  go 0
+  where
+    go i = do
+      x <- P.await
+      when (i == 0) $ do
+        P.yield x
       go $ (i+1) `mod` k
 
 
