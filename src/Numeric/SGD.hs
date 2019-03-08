@@ -61,13 +61,19 @@ module Numeric.SGD
   , runIO
 
   -- * Combinators
+  -- ** Input
   , pipeSeq
   , pipeRan
+  -- ** Batch
   , batch
-  , batchGrad
+  , batchGradSeq
+  , batchGradPar
+  , batchGradPar'
+  -- ** Output
   , result
-  , every
+  -- ** Misc
   , keepEvery
+  , decreasingBy
 
   -- * Re-exports
   , def
@@ -81,8 +87,8 @@ import           Numeric.Natural (Natural)
 -- import qualified System.Random as R
 
 import           Control.Monad (when, forM_, forever)
-import           Control.Parallel.Strategies (parMap, rdeepseq)
-import           Control.DeepSeq (NFData, )
+import           Control.Parallel.Strategies (parMap, rseq, rdeepseq, Strategy)
+import           Control.DeepSeq (NFData)
 import qualified Control.Monad.State.Strict as State
 
 import           Data.Functor.Identity (Identity(..))
@@ -164,8 +170,8 @@ instance Default Config where
 -- should be convenient to use when the training dataset is large.
 --
 -- An alternative is to use the simpler function `run`, or to build a custom
--- SGD pipeline based on lower-level combinators (`pipeSeq`, `Ada.adaDelta`,
--- `every`, `result`, etc.).
+-- SGD pipeline based on lower-level combinators (`pipeSeq`, `batch`,
+-- `Adam.adam`, `keepEvery`, `result`, etc.).
 runIO
   :: (ParamSet p)
   => Config
@@ -181,31 +187,40 @@ runIO
     -- ^ Initial parameter values
   -> IO p
 runIO Config{..} sgd quality0 dataSet net0 = do
-  report net0
+  _ <- report net0
   result net0 $ pipeData dataSet
     >-> batch (fromIntegral batchSize)
-    >-> keepEvery ( max 1
-          $ fromIntegral batchSize
-          - fromIntegral batchOverlap
-          )
+    >-> batchFilter
     >-> sgd net0
-    >-> P.take realIterNum
-    >-> every realReportPeriod report
+    >-> keepEvery realReportPeriod
+    >-> P.take (fromIntegral iterNum)
+    >-> decreasingBy report
   where
+    -- Data streaming function
     pipeData = forever .
       if batchRandom
          then pipeRan
          else pipeSeq
+    -- Number of new elements in each subsequent batch
+    batchNew = max 1
+      ( fromIntegral batchSize
+      - fromIntegral batchOverlap )
+    -- Batch stream filter
+    batchFilter = do
+      P.await >>= P.yield
+      keepEvery batchNew
     -- Iteration (epoch) scaling
-    iterScale x = fromIntegral (size dataSet) * x
-                / (fromIntegral batchSize - fromIntegral batchOverlap)
+    iterScale x = fromIntegral (size dataSet) * x / fromIntegral batchNew
     -- Number of iterations and reporting period
-    realIterNum = ceiling $ iterScale (fromIntegral iterNum :: Double)
-    realReportPeriod = floor $ iterScale reportEvery
+    -- realIterNum = ceiling $ iterScale (fromIntegral iterNum :: Double)
+    -- realReportPeriod = floor $ iterScale reportEvery
+    realReportPeriod = ceiling $ iterScale reportEvery
     -- Network quality over the entire training dataset
     report net = do
-      putStr . show =<< quality net
+      q <- quality net
+      putStr $ show q
       putStrLn $ " (norm_2 = " ++ show (norm_2 net) ++ ")"
+      return q
     quality net = do
       res <- IO.newIORef 0.0
       forM_ [0 .. size dataSet - 1] $ \ix -> do
@@ -250,26 +265,49 @@ batch k = flip State.evalStateT [] . forever $ do
   State.put xs'
 
 
--- | Adapt the gradient function to handle (mini-)batches.
--- TODO: Mention that `p` has to be strict for parallelism?
--- UPDATE: not relevant anymore?
-batchGrad
+-- | Adapt the gradient function to handle (mini-)batches.  Relies on the @p@'s
+-- `NFData` instance to efficiently calculate gradients in parallel.
+batchGradPar
   :: (ParamSet p, NFData p)
   => (e -> p -> p)
   -> ([e] -> p -> p)
-batchGrad grad xs param =
---   = foldl1' add
---   . parMap rseq gradOn
---   $ partition numCapabilities xs
---   where
---     gradOn = foldl1' add . map (flip grad param)
-  case parMap rdeepseq (\e -> grad e param) xs of
-  -- case parMap pseq (\e -> grad e param) xs of
+batchGradPar = batchGradWith rdeepseq
+
+
+-- | A version of `batchGradPar` with no `NFData` constraint.  Evaluates the
+-- sub-gradients calculated in parallel to weak head normal form.
+batchGradPar'
+  :: (ParamSet p)
+  => (e -> p -> p)
+  -> ([e] -> p -> p)
+batchGradPar' = batchGradWith rseq
+
+
+-- | Adapt the gradient function to handle (mini-)batches.  The sub-gradients
+-- of the individual batch elements are evaluated in parallel based on the
+-- given `Strategy`.
+batchGradWith
+  :: (ParamSet p)
+  => Strategy p
+  -> (e -> p -> p)
+  -> ([e] -> p -> p)
+batchGradWith strategy grad xs param =
+  case parMap strategy (\e -> grad e param) xs of
+    [] -> param
+    -- TODO: the fold is sequential, we could try to parallize it as well.
+    ps -> foldl1' add ps
+
+
+-- | Adapt the gradient function to handle (mini-)batches.  The function
+-- calculates the individual sub-gradients sequentially.
+batchGradSeq
+  :: (ParamSet p)
+  => (e -> p -> p)
+  -> ([e] -> p -> p)
+batchGradSeq grad xs param =
+  case map (flip grad param) xs of
     [] -> param
     ps -> foldl1' add ps
---   where
---     pseq p = do
---       norm_2 p `seq` return p
 
 
 -- | Extract the result of the SGD calculation (the last parameter
@@ -284,29 +322,67 @@ result
 result pDef = fmap (maybe pDef id) . P.last
 
 
--- | Apply the given function every @k@ param sets flowing downstream.
-every :: (Monad m) => Int -> (p -> m ()) -> P.Pipe p p m x
-every k f = do
-  go (1 `mod` k)
-  where
-    go i = do
-      paramSet <- P.await
-      when (i == 0) $ do
-        P.lift $ f paramSet
-      P.yield paramSet
-      go $ (i+1) `mod` k
+-- -- | Apply the given monadic function to every @k@-th value flowing downstream.
+-- every :: (Monad m) => Int -> (p -> m ()) -> P.Pipe p p m x
+-- every k f = do
+--   go (1 `mod` k)
+--   where
+--     go i = do
+--       paramSet <- P.await
+--       when (i == 0) $ do
+--         P.lift $ f paramSet
+--       P.yield paramSet
+--       go $ (i+1) `mod` k
 
 
 -- | Keep every @k@-th element flowing downstream and discard all the others.
 keepEvery :: (Monad m) => Int -> P.Pipe a a m x
-keepEvery k = do
-  go 0
+keepEvery k = forever $ do
+  sequence_ $ replicate (k-1) P.await
+  P.await >>= P.yield
+-- keepEvery k = do
+--   go (1 `mod` k)
+--   where
+--     go i = do
+--       x <- P.await
+--       when (i == 0) $ do
+--         P.yield x
+--       go $ (i+1) `mod` k
+
+
+-- -- | Keep the elements with the corresponding `True` in the argument list.
+-- --
+-- -- TODO: (=) or (==) in the following example?  And is this example correct?
+-- -- @
+-- -- keep (forever True) = P.id
+-- -- @
+-- keep :: (Monad m) => [Bool] -> P.Pipe a a m ()
+-- keep [] = return ()
+-- keep (b:bs) = do
+--   x <- P.await
+--   when b (P.yield x)
+--   keep bs
+-- 
+-- 
+-- -- | Create the mask to `keep` each @k@-th element flowing downstream.
+-- every :: Int -> [Bool]
+-- every k = cycle $ replicate (k-1) False ++ [True]
+
+
+-- | Make the stream decreasing in the given (monadic) function by discarding
+-- elements with values higher than those already seen.
+decreasingBy :: (Monad m, Ord a) => (p -> m a) -> P.Pipe p p m x
+decreasingBy f = do
+  x <- P.await
+  v <- P.lift (f x)
+  P.yield x
+  go v
   where
-    go i = do
+    go w = do
       x <- P.await
-      when (i == 0) $ do
-        P.yield x
-      go $ (i+1) `mod` k
+      v <- P.lift (f x)
+      when (v < w) (P.yield x)
+      go (min v w)
 
 
 -------------------------------
