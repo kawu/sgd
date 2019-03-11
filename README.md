@@ -16,7 +16,7 @@ interface in which SGD takes the form of a process consuming dataset subsets
 (the so-called mini-batches) and producing a stream of output parameter values.
 
 The `sgd` library implements several SGD variants (SGD with momentum, AdaDelta,
-Adam) and handles heterogenous parameter representations (vectors, maps, custom
+Adam) and handles heterogeneous parameter representations (vectors, maps, custom
 records, etc.).  It can be used in combination with automatic differentiation
 libraries ([ad](http://hackage.haskell.org/package/ad),
 [backprop](http://hackage.haskell.org/package/backprop)), which can be used to

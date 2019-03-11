@@ -6,48 +6,29 @@
 --
 -- SGD is a method for optimizing a global objective function defined as a sum
 -- of smaller, differentiable functions.  The individual component functions
--- share the same set of parameters, represented by the `ParamSet` class.
+-- share the same set of parameters, represented by the `ParamSet` class.  This
+-- allows for heterogeneous parameter representation (vectors, maps, custom
+-- records, etc.).
+--
+-- The library adopts a `P.Pipe`-based interface in which `SGD` takes the form
+-- of a process consuming dataset subsets (the so-called mini-batches) and
+-- producing a stream of output parameter values.  The library implements
+-- different variants of `SGD` (`Mom.momentum`, `Adam.adam`, `Ada.adaDelta`)
+-- which can be executed in either the pure context (`run`) or in IO (`runIO`).
+-- The use of lower-level pipe-processing combinators (`pipeRan`, `batch`,
+-- `result`, etc.) is also possible.
 --
 -- To perform SGD, the gradients of the individual functions need to be
--- determined.  This can be done manually or automatically, using one of the
--- automatic differentiation libraries (ad, backprop) available in Haskell.
+-- determined.  This can be done manually or automatically, using an automatic
+-- differentiation library (<http://hackage.haskell.org/package/ad ad>,
+-- <http://hackage.haskell.org/package/backprop backprop>).
 --
--- For instance, let's say we have a list of functions defined as:
---
--- > funs = [\x -> 0.3*x^2, \x -> -2*x, const 3, sin]
---
--- The global objective is then defined as:
---
--- > objective x = sum $ map ($x) funs
---
--- We can manually determine the individual derivatives:
---
--- > derivs = [\x -> 0.6*x, const (-2), const 0, cos]
---
--- or use an automatic differentiation library, for instance:
---
--- > import qualified Numeric.AD as AD
--- > derivs = map
--- >   (\k -> AD.diff (funs !! k))
--- >   [0..length funs-1]
---
--- Finally, `run` allows to approach a (potentially local) minimum of the
--- global objective function:
---
--- >>> run (momentum def id) (take 10000 $ cycle derivs) 0.0
--- 4.180177042912455
---
--- where:
--- 
---     * @(take 10000 $ cycle derivs)@ is the stream of training examples
---     * @(momentum def id)@ is the selected SGD variant (`Mom.momentum`),
---     supplied with the default configuration (`def`) and the function (`id`)
---     for calculating the gradient from a training example
---     * @0.0@ is the initial parameter value
-
 
 module Numeric.SGD
   (
+  -- * Example
+  -- $example
+
   -- * SGD variants
     Mom.momentum
   , Ada.adaDelta
@@ -107,6 +88,44 @@ import qualified Numeric.SGD.Adam as Adam
 import           Numeric.SGD.Type
 import           Numeric.SGD.ParamSet
 import           Numeric.SGD.DataSet
+
+
+{- $example
+
+  Let's say we have a list of functions defined as:
+
+> funs = [\x -> 0.3*x^2, \x -> -2*x, const 3, sin]
+
+  The global objective (which we want to minimize) is then defined as:
+
+> objective x = sum $ map ($x) funs
+
+  To perform SGD, we can either manually determine the individual derivatives:
+
+> derivs = [\x -> 0.6*x, const (-2), const 0, cos]
+
+  or use an automatic differentiation library, for instance:
+
+> import qualified Numeric.AD as AD
+> derivs = map
+>   (\k -> AD.diff (funs !! k))
+>   [0..length funs-1]
+
+  Finally, `run` allows to approach a (potentially local) minimum of the
+  global objective function:
+
+>>> run (momentum def id) (take 10000 $ cycle derivs) 0.0
+4.180177042912455
+
+  where:
+
+    * @(take 10000 $ cycle derivs)@ is the stream of training examples
+    * @(momentum def id)@ is the selected SGD variant (`Mom.momentum`),
+    supplied with the default configuration (`def`) and the function (`id`)
+    for calculating the gradient from a training example
+    * @0.0@ is the initial parameter value
+
+-}
 
 
 -------------------------------

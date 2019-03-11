@@ -27,7 +27,8 @@ funs =
 
 
 -- | The corresponding derivatives
-derivs = map
+derivs =
+  map
   (\k -> AD.diff (funs !! k))
   [0 .. length funs - 1]
 --   [ \x -> 0.6*x
@@ -43,10 +44,10 @@ objective x = sum $ map ($x) funs
 
 main1 = print $
   SGD.run
-    -- (momentum SGD.def id)
+    (SGD.momentum SGD.def id)
     -- (SGD.adaDelta SGD.def id)
-    (SGD.adam SGD.def id)
-    (take 100000 $ cycle derivs)
+    -- (SGD.adam SGD.def id)
+    (take 10000 $ cycle derivs)
     (0.0 :: Double)
 
 
