@@ -39,6 +39,7 @@ module Numeric.SGD
 
   -- * IO-based SGD
   , Config (..)
+  , iterNumPerEpoch
   , runIO
 
   -- * Combinators
@@ -184,6 +185,25 @@ instance Default Config where
     }
 
 
+-- | Number of new elements in each new batch
+batchNew :: Config -> Int
+batchNew cfg = max 1
+  ( fromIntegral (batchSize cfg)
+  - fromIntegral (batchOverlap cfg)
+  )
+
+
+-- | Calculate the effective number of SGD iterations (and gradient
+-- calculations) performed per epoch.
+iterNumPerEpoch
+  :: (Integral a)
+  => Config
+  -> a -- ^ Dataset size
+  -> Double
+iterNumPerEpoch cfg size =
+  fromIntegral size / fromIntegral (batchNew cfg)
+
+
 -- | Perform SGD in the IO monad, regularly reporting the value of the
 -- objective function on the entire dataset.  A higher-level wrapper which
 -- should be convenient to use when the training dataset is large.
@@ -205,7 +225,7 @@ runIO
   -> p
     -- ^ Initial parameter values
   -> IO p
-runIO Config{..} sgd quality0 dataSet net0 = do
+runIO cfg@Config{..} sgd quality0 dataSet net0 = do
   _ <- report net0
   result net0 $ pipeData dataSet
     >-> batch (fromIntegral batchSize)
@@ -220,20 +240,13 @@ runIO Config{..} sgd quality0 dataSet net0 = do
       if batchRandom
          then pipeRan
          else pipeSeq
-    -- Number of new elements in each subsequent batch
-    batchNew = max 1
-      ( fromIntegral batchSize
-      - fromIntegral batchOverlap )
     -- Batch stream filter
     batchFilter = do
       P.await >>= P.yield
-      keepEvery batchNew
+      keepEvery (batchNew cfg)
     -- Iteration (epoch) scaling
-    iterScale x = fromIntegral (size dataSet) * x / fromIntegral batchNew
-    -- Number of iterations and reporting period
-    -- realIterNum = ceiling $ iterScale (fromIntegral iterNum :: Double)
-    -- realReportPeriod = floor $ iterScale reportEvery
-    realReportPeriod = ceiling $ iterScale reportEvery
+    realReportPeriod = ceiling $
+      reportEvery * iterNumPerEpoch cfg (size dataSet)
     -- Network quality over the entire training dataset
     report net = do
       q <- quality net

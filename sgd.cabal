@@ -1,5 +1,5 @@
 name:               sgd
-version:            0.7.0.1
+version:            0.8.0.0
 synopsis:           Stochastic gradient descent
 description:
     Stochastic gradient descent library.

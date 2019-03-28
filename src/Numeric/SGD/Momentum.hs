@@ -10,6 +10,7 @@
 
 module Numeric.SGD.Momentum
   ( Config(..)
+  , scaleTau
   , momentum
   ) where
 
@@ -26,20 +27,26 @@ import           Numeric.SGD.ParamSet
 
 -- | Momentum configuration
 data Config = Config
-  { gain0 :: Double
-  -- ^ Initial gain parameter, used to scale the gradient
+  { alpha0 :: Double
+    -- ^ Initial step size, used to scale the gradient
   , tau :: Double
-  -- ^ After how many gradient calculations the gain parameter is halved
+    -- ^ The step size after k * `tau` iterations = `alpha0` / (k + 1)
   , gamma :: Double
-  -- ^ Momentum term
+    -- ^ Momentum term
   } deriving (Show, Eq, Ord, Generic)
 
 instance Default Config where
   def = Config
-    { gain0 = 0.01
+    { alpha0 = 0.01
     , gamma = 0.9
     , tau = 1000
     }
+
+
+-- | Scale the `tau` parameter.  Useful e.g. to account for the size of the
+-- training dataset.
+scaleTau :: Double -> Config -> Config
+scaleTau coef cfg = cfg {tau = coef * tau cfg}
 
 
 -- | Stochastic gradient descent with momentum. See "Numeric.SGD.Momentum" for
@@ -58,13 +65,13 @@ momentum Config{..} gradient net0 =
   where
 
     -- Gain in the k-th iteration
-    gain k
-      = (gain0 * tau)
+    alpha k
+      = (alpha0 * tau)
       / (tau + fromIntegral k)
 
     go k moment net = do
       x <- P.await
-      let grad = scale (gain k) (gradient x net)
+      let grad = scale (alpha k) (gradient x net)
           moment' = scale gamma moment `add` grad
           newNet = net `sub` moment'
       P.yield newNet
