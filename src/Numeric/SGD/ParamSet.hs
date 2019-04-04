@@ -431,6 +431,17 @@ instance ParamSet Double where
   norm_2 = abs
 
 
+instance (ParamSet a, ParamSet b) => ParamSet (a, b) where
+  pmap f (x, y) = (pmap f x, pmap f y)
+  add (x1, y1) (x2, y2) = (x1 `add` x2, y1 `add` y2)
+  sub (x1, y1) (x2, y2) = (x1 `sub` x2, y1 `sub` y2)
+  mul (x1, y1) (x2, y2) = (x1 `mul` x2, y1 `mul` y2)
+  div (x1, y1) (x2, y2) = (x1 `div` x2, y1 `div` y2)
+  norm_2 (x, y)
+    = sqrt . sum . map ((^(2::Int)))
+    $ [norm_2 x, norm_2 y]
+
+
 instance (KnownNat n) => ParamSet (LA.R n) where
   zero = const 0
   pmap = LA.dvmap

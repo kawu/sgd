@@ -40,6 +40,8 @@ module Numeric.SGD
   -- * IO-based SGD
   , Config (..)
   , iterNumPerEpoch
+  , reportObjective
+  , objectiveWith
   , runIO
 
   -- * Combinators
@@ -204,6 +206,37 @@ iterNumPerEpoch cfg size =
   fromIntegral size / fromIntegral (batchNew cfg)
 
 
+-- | Report the total objective value on stdout.
+reportObjective
+  :: (ParamSet p)
+  => (e -> p -> Double)
+    -- ^ Value of the objective function on a dataset element
+  -> DataSet e
+    -- ^ Training dataset
+  -> p -> IO Double
+reportObjective objAt dataSet net = do
+  q <- objectiveWith objAt dataSet net
+  putStr $ show q
+  putStrLn $ " (norm_2 = " ++ show (norm_2 net) ++ ")"
+  return q
+
+
+-- | Value of the objective function over the entire dataset (i.e. the sum of
+-- the objectives on all dataset elements).
+objectiveWith
+  :: (e -> p -> Double)
+    -- ^ Value of the objective function on a dataset element
+  -> DataSet e
+    -- ^ Training dataset
+  -> p -> IO Double
+objectiveWith objAt dataSet net = do
+  res <- IO.newIORef 0.0
+  forM_ [0 .. size dataSet - 1] $ \ix -> do
+    x <- elemAt dataSet ix
+    IO.modifyIORef' res (+ objAt x net)
+  IO.readIORef res
+
+
 -- | Perform SGD in the IO monad, regularly reporting the value of the
 -- objective function on the entire dataset.  A higher-level wrapper which
 -- should be convenient to use when the training dataset is large.
@@ -217,23 +250,23 @@ runIO
     -- ^ SGD configuration
   -> SGD IO [e] p
     -- ^ SGD pipe consuming mini-batches of dataset elements
-  -> (e -> p -> Double)
-    -- ^ Value of the objective function on a dataset element (used for model
-    -- quality reporting)
+  -> (p -> IO Double)
+    -- ^ Quality reporting function (the reporting frequency is specified
+    -- via `reportEvery`)
   -> DataSet e
     -- ^ Training dataset
   -> p
     -- ^ Initial parameter values
   -> IO p
-runIO cfg@Config{..} sgd quality0 dataSet net0 = do
-  _ <- report net0
+runIO cfg@Config{..} sgd reportObj dataSet net0 = do
+  _ <- reportObj net0
   result net0 $ pipeData dataSet
     >-> batch (fromIntegral batchSize)
     >-> batchFilter
     >-> sgd net0
     >-> keepEvery realReportPeriod
     >-> P.take (fromIntegral iterNum)
-    >-> decreasingBy report
+    >-> decreasingBy reportObj
   where
     -- Data streaming function
     pipeData = forever .
@@ -247,18 +280,6 @@ runIO cfg@Config{..} sgd quality0 dataSet net0 = do
     -- Iteration (epoch) scaling
     realReportPeriod = ceiling $
       reportEvery * iterNumPerEpoch cfg (size dataSet)
-    -- Network quality over the entire training dataset
-    report net = do
-      q <- quality net
-      putStr $ show q
-      putStrLn $ " (norm_2 = " ++ show (norm_2 net) ++ ")"
-      return q
-    quality net = do
-      res <- IO.newIORef 0.0
-      forM_ [0 .. size dataSet - 1] $ \ix -> do
-        x <- elemAt dataSet ix
-        IO.modifyIORef' res (+ quality0 x net)
-      IO.readIORef res
 
 
 ------------------------------- 
