@@ -66,19 +66,20 @@ module Numeric.SGD
 
 import           GHC.Generics (Generic)
 -- import           GHC.Conc (numCapabilities)
+
 import           Numeric.Natural (Natural)
 
 -- import qualified System.Random as R
 
-import           Control.Monad (when, forM_, forever)
+import           Control.Monad (when, forever) -- forM_,
 import           Control.Parallel.Strategies (parMap, rseq, rdeepseq, Strategy)
 import           Control.DeepSeq (NFData)
 import qualified Control.Monad.State.Strict as State
 
 import           Data.Functor.Identity (Identity(..))
-import           Data.List (foldl1') -- , transpose)
+import           Data.List (foldl1') --, transpose) --foldl',
 
-import qualified Data.IORef as IO
+-- import qualified Data.IORef as IO
 import           Data.Default
 
 import qualified Pipes as P
@@ -230,11 +231,22 @@ objectiveWith
     -- ^ Training dataset
   -> p -> IO Double
 objectiveWith objAt dataSet net = do
-  res <- IO.newIORef 0.0
-  forM_ [0 .. size dataSet - 1] $ \ix -> do
-    x <- elemAt dataSet ix
-    IO.modifyIORef' res (+ objAt x net)
-  IO.readIORef res
+
+  elems <- loadData dataSet
+  let scores = parMap rseq (flip objAt net) elems
+  return $ sum scores
+
+--   parts <- partition numCapabilities <$> loadData dataSet
+--   let scores = parMap rseq groupScore parts
+--   return $ sum scores
+--   where
+--     groupScore = sum . map (flip objAt net)
+
+--   res <- IO.newIORef 0.0
+--   forM_ [0 .. size dataSet - 1] $ \ix -> do
+--     x <- elemAt dataSet ix
+--     IO.modifyIORef' res (+ objAt x net)
+--   IO.readIORef res
 
 
 -- | Perform SGD in the IO monad, regularly reporting the value of the
