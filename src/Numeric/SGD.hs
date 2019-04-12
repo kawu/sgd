@@ -65,7 +65,7 @@ module Numeric.SGD
 
 
 import           GHC.Generics (Generic)
--- import           GHC.Conc (numCapabilities)
+import           GHC.Conc (numCapabilities)
 
 import           Numeric.Natural (Natural)
 
@@ -77,7 +77,7 @@ import           Control.DeepSeq (NFData)
 import qualified Control.Monad.State.Strict as State
 
 import           Data.Functor.Identity (Identity(..))
-import           Data.List (foldl1') --, transpose) --foldl',
+import           Data.List (foldl1', transpose) --foldl',
 
 -- import qualified Data.IORef as IO
 import           Data.Default
@@ -232,15 +232,15 @@ objectiveWith
   -> p -> IO Double
 objectiveWith objAt dataSet net = do
 
-  elems <- loadData dataSet
-  let scores = parMap rseq (flip objAt net) elems
-  return $ sum scores
-
---   parts <- partition numCapabilities <$> loadData dataSet
---   let scores = parMap rseq groupScore parts
+--   elems <- loadData dataSet
+--   let scores = parMap rseq (flip objAt net) elems
 --   return $ sum scores
---   where
---     groupScore = sum . map (flip objAt net)
+
+  parts <- partition numCapabilities <$> loadData dataSet
+  let scores = parMap rseq groupScore parts
+  return $ sum scores
+  where
+    groupScore = sum . map (flip objAt net)
 
 --   res <- IO.newIORef 0.0
 --   forM_ [0 .. size dataSet - 1] $ \ix -> do
@@ -455,9 +455,9 @@ decreasingBy f = do
 -------------------------------
 
 
--- partition :: Int -> [a] -> [[a]]
--- partition n =
---     transpose . group n
---   where
---     group _ [] = []
---     group k xs = take k xs : (group k $ drop k xs)
+partition :: Int -> [a] -> [[a]]
+partition n =
+    transpose . group n
+  where
+    group _ [] = []
+    group k xs = take k xs : (group k $ drop k xs)
