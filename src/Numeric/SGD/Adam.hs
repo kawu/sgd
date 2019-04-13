@@ -99,7 +99,7 @@ adam Config{..} gradient net0 =
             ( pmap (*alpha t) mb `div`
               (pmap (+eps) (pmap sqrt vb))
             )
-      P.yield newNet
+      newNet `seq` P.yield newNet
       go (t+1) m' v' newNet
 
 
