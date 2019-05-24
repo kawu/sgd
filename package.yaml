@@ -1,5 +1,5 @@
 name:                sgd
-version:             0.8.0.0
+version:             0.8.0.2
 github:              "kawu/sgd"
 license:             BSD3
 author:              "Jakub Waszczuk"
@@ -11,13 +11,15 @@ extra-source-files:
 - changelog
 
 # Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
+synopsis:            Stochastic gradient descent library
+category:            Math
 
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/kawu/sgd#readme>
+description:
+    # Please see the README on GitHub at <https://github.com/kawu/sgd#readme>
+    Import "Numeric.SGD" to use the library.
 
 dependencies:
 - base >= 4.7 && < 5
