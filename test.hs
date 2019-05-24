@@ -44,8 +44,9 @@ objective x = sum $ map ($x) funs
 
 main1 = print $
   SGD.run
-    (SGD.momentum SGD.def id)
-    -- (SGD.adaDelta SGD.def id)
+    -- (SGD.momentum SGD.def id)
+    -- (SGD.adaDelta (SGD.def {Ada.decay = 0.9, Ada.eps = 1.0e-8}) id)
+    (SGD.adaDelta SGD.def id)
     -- (SGD.adam SGD.def id)
     (take 10000 $ cycle derivs)
     (0.0 :: Double)

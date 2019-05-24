@@ -111,9 +111,12 @@ import           Numeric.SGD.DataSet
   or use an automatic differentiation library, for instance:
 
 > import qualified Numeric.AD as AD
-> derivs = map
->   (\k -> AD.diff (funs !! k))
->   [0..length funs-1]
+> derivs =
+>   [ AD.diff $ \x -> 0.3*x^2
+>   , AD.diff $ \x -> -2*x
+>   , AD.diff $ const 3
+>   , AD.diff $ sin
+>   ]
 
   Finally, `run` allows to approach a (potentially local) minimum of the
   global objective function:

@@ -123,8 +123,8 @@ withDisk xs handler = withTempDirectory "." ".sgd" $ \tmpDir -> do
     -- Avoid decodeFile laziness when using some older versions of the binary
     -- library (as of year 2019, this could be probably simplified)
     let at ix = do
-        cs <- B.readFile (tmpDir </> show ix)
-        return . decode $ BL.fromChunks [cs]
+          cs <- B.readFile (tmpDir </> show ix)
+          return . decode $ BL.fromChunks [cs]
 
     handler $ DataSet {size = n, elemAt = at}
 
