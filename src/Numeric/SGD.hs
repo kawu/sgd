@@ -366,6 +366,30 @@ batchGradWith strategy grad xs param =
     ps -> foldl1' add ps
 
 
+-- -- | Adapt the gradient function to handle (mini-)batches.  The sub-gradients
+-- -- of the individual batch elements are evaluated in parallel based on the
+-- -- given `Strategy`.
+-- batchGradWith
+--   :: (ParamSet p)
+--   => Strategy p
+--   -> (e -> p -> p)
+--   -> ([e] -> p -> p)
+-- batchGradWith strategy grad xs param =
+-- 
+--   addAll grads
+-- 
+--   where
+-- 
+--     groups = partition numCapabilities xs
+--     grads = parMap strategy gradMany groups
+-- 
+--     -- TODO: can we assume here that the group is non-empty?
+--     gradMany = foldl1' add . map (\e -> grad e param)
+-- 
+--     addAll [] = param
+--     addAll ps = foldl1' add ps
+
+
 -- | Adapt the gradient function to handle (mini-)batches.  The function
 -- calculates the individual sub-gradients sequentially.
 batchGradSeq
