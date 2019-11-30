@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+-- {-# LANGUAGE CPP #-}
 
 -- | A gradient is represented by an IntMap from gradient indices
 -- to values. Elements with no associated values in the gradient
@@ -26,13 +26,13 @@ module Numeric.SGD.Grad
 import Data.List (foldl')
 import Control.Applicative ((<$>), (<*>))
 import Control.Monad.Par.Scheds.Direct (Par, runPar, get)
-#if MIN_VERSION_containers(0,4,2)
+-- #if MIN_VERSION_containers(0,4,2)
 import Control.Monad.Par.Scheds.Direct (spawn)
-#else
-import Control.DeepSeq (deepseq)
-import Control.Monad.Par.Scheds.Direct (spawn_)
-#endif
-import qualified Data.IntMap as M
+-- #else
+-- import Control.DeepSeq (deepseq)
+-- import Control.Monad.Par.Scheds.Direct (spawn_)
+-- #endif
+import qualified Data.IntMap.Strict as M
 
 import Numeric.SGD.LogSigned
 
@@ -44,23 +44,7 @@ type Grad = M.IntMap LogSigned
 
 {-# INLINE insertWith #-}
 insertWith :: (a -> a -> a) -> M.Key -> a -> M.IntMap a -> M.IntMap a
-#if MIN_VERSION_containers(0,4,1)
-insertWith = M.insertWith'
-#else
-insertWith f k x m = 
-    M.alter g k m
-  where
-    g my = case my of
-        Nothing -> Just x
-        Just y  ->
-            let z = f x y
-            in  z `seq` Just z
--- insertWith f k x m = case M.lookup k m of
---     Just y  ->
---         let x' = f x y
---         in  x' `seq` M.insert k x' m
---     Nothing -> x `seq` M.insert k x m
-#endif
+insertWith = M.insertWith
 
 -- | Add normal-domain double to the gradient at the given position.
 {-# INLINE add #-}
@@ -114,16 +98,9 @@ parUnionsP :: [Grad] -> Par Grad
 parUnionsP [x] = return x
 parUnionsP zs  = do
     let (xs, ys) = split zs
-#if MIN_VERSION_containers(0,4,2)
     xsP <- spawn (parUnionsP xs)
     ysP <- spawn (parUnionsP ys)
     M.unionWith (+) <$> get xsP <*> get ysP
-#else
-    xsP <- spawn_ (parUnionsP xs)
-    ysP <- spawn_ (parUnionsP ys)
-    x <- M.unionWith (+) <$> get xsP <*> get ysP
-    M.elems x `deepseq` return x
-#endif
   where
     split []        = ([], [])
     split (x:[])    = ([x], [])
